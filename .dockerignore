@@ -5,6 +5,7 @@
 # Docker
 Dockerfile
 docker/
+!docker/download_model.py
 
 # Documentation
 docs/
