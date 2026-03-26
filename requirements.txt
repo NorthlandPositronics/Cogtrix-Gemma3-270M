@@ -1,0 +1,24 @@
+# Python dependencies for Gemma 3 270M minimal container (CPU-only)
+# Pinned versions for reproducibility and minimal size
+
+# Core ML framework - CPU ONLY (no CUDA, ~600MB smaller than GPU version)
+# Using PyTorch CPU-only build
+torch==2.4.0+cpu
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+# Hugging Face Transformers - 4.50+ required for Gemma 3 support
+transformers>=4.50.0
+
+# Safetensors for efficient model loading
+safetensors>=0.5.0
+
+# Accelerate for device management and optimization
+accelerate>=1.0.0
+
+# Hugging Face hub for model downloads
+huggingface-hub>=0.28.0
+
+# API server dependencies
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+pydantic==2.9.2
