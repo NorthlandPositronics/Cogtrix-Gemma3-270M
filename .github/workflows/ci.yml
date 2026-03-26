@@ -1,0 +1,143 @@
+name: CI – Quality & Docker
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # Validation jobs — run on PRs and manual triggers only.
+  # ─────────────────────────────────────────────────────────────
+
+  # 1. Code quality — Python syntax + Dockerfile lint
+  quality:
+    name: Code quality
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Syntax check (Python)
+        run: python -m compileall -q src/
+
+      - name: Dockerfile lint (hadolint)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: docker/Dockerfile
+          failure-threshold: error
+
+  # ─────────────────────────────────────────────────────────────
+  # Publish jobs — run on push to main only.
+  # ─────────────────────────────────────────────────────────────
+
+  # 2. Publish per-arch images to GHCR
+  #    NOTE: model weights must be present locally to build the image.
+  #    This job is skipped in CI — use `make build` locally to publish.
+  publish:
+    name: Publish (${{ matrix.arch }})
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ${{ matrix.runner }}
+    continue-on-error: true
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Lowercase image name
+        run: |
+          REPO="${{ github.repository }}"
+          echo "IMAGE_NAME=${REPO,,}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        run: |
+          SHA="${{ github.sha }}"
+          TAG="ghcr.io/${{ env.IMAGE_NAME }}:${SHA::7}-${{ matrix.arch }}"
+          docker build -f docker/Dockerfile -t "${TAG}" .
+          docker push "${TAG}"
+
+  # 3. Publish multi-arch manifest
+  publish-manifest:
+    name: Publish manifest
+    needs: [publish]
+    if: ${{ !cancelled() && needs.publish.result != 'skipped' }}
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Lowercase image name
+        run: |
+          REPO="${{ github.repository }}"
+          echo "IMAGE_NAME=${REPO,,}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push manifest
+        run: |
+          BASE="ghcr.io/${{ env.IMAGE_NAME }}"
+          SHA="${{ github.sha }}"
+          TAG="${SHA::7}"
+
+          docker manifest create "${BASE}:${TAG}" \
+            "${BASE}:${TAG}-amd64" \
+            "${BASE}:${TAG}-arm64"
+          docker manifest push "${BASE}:${TAG}"
+
+          docker manifest create "${BASE}:latest" \
+            "${BASE}:${TAG}-amd64" \
+            "${BASE}:${TAG}-arm64"
+          docker manifest push "${BASE}:latest"
+
+  # ─────────────────────────────────────────────────────────────
+  # 4. CI summary (always runs)
+  # ─────────────────────────────────────────────────────────────
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [quality, publish, publish-manifest]
+    steps:
+      - name: Post summary
+        run: |
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Result |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Code quality (syntax, Dockerfile lint) | ${{ needs.quality.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Publish to GHCR | ${{ needs.publish.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Publish manifest | ${{ needs.publish-manifest.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Toolchain:** py_compile · hadolint · GHCR" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,20 @@
+name: Guard – main source branch
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-source:
+    name: Source branch must be next
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR source is next or release-please
+        run: |
+          src="${{ github.head_ref }}"
+          if [ "$src" != "next" ] && [[ "$src" != release-please--* ]]; then
+            echo "::error::PRs to main are only allowed from the 'next' branch (or release-please branches)."
+            echo "::error::This PR is from '$src'. Merge your branch into 'next' first."
+            exit 1
+          fi
+          echo "Source branch '$src' — OK"
