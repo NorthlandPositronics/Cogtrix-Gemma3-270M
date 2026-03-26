@@ -6,6 +6,7 @@
 Dockerfile
 docker/
 !docker/download_model.py
+!docker/quantize_model.py
 
 # Documentation
 docs/

@@ -13,8 +13,10 @@ Usage:
 
 import argparse
 import sys
+from pathlib import Path
+
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 
 def parse_args():
@@ -87,32 +89,45 @@ def get_device():
 
 
 def load_model(model_path, device, num_threads=4):
-    """Load the model and tokenizer for CPU inference."""
-    print(f"\nLoading model on CPU (using {num_threads} threads)...")
-    
-    # Set number of threads
+    """Load the model and tokenizer for CPU inference.
+
+    Prefers model_quantized.pt (INT8, ~260 MB) when present — produced by the
+    build-time quantization stage.  Falls back to the original safetensors
+    weights (bfloat16, ~512 MB) for development / non-optimised images.
+    """
     torch.set_num_threads(num_threads)
-    
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(
-        model_path,
-        trust_remote_code=True
-    )
-    
-    # Load model optimized for CPU
-    model = AutoModelForCausalLM.from_pretrained(
-        model_path,
-        torch_dtype=torch.float32,  # Use float32 for CPU
-        device_map="cpu",
-        low_cpu_mem_usage=True,
-        trust_remote_code=True
-    )
-    
-    # Set model to evaluation mode
+
+    tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+
+    quantized = Path(model_path) / "model_quantized.pt"
+    if quantized.exists():
+        print(f"\nLoading INT8-quantized model on CPU (using {num_threads} threads)...")
+        config = AutoConfig.from_pretrained(model_path, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_config(config)
+        # Apply the same quantize_dynamic transformation used at build time so
+        # that the state-dict keys match before we load the weights.
+        model = torch.quantization.quantize_dynamic(
+            model, {torch.nn.Linear}, dtype=torch.qint8
+        )
+        # weights_only=False is required for quantized (qint8) tensor objects
+        state_dict = torch.load(str(quantized), map_location="cpu", weights_only=False)
+        model.load_state_dict(state_dict)
+    else:
+        print(f"\nLoading model on CPU (using {num_threads} threads)...")
+        model = AutoModelForCausalLM.from_pretrained(
+            model_path,
+            torch_dtype=torch.bfloat16,
+            device_map="cpu",
+            low_cpu_mem_usage=True,
+            trust_remote_code=True,
+        )
+
     model.eval()
-    
     print("✓ Model loaded successfully!")
-    print(f"  Model size: ~{model.get_memory_footprint() / 1024 / 1024:.0f} MB")
+    try:
+        print(f"  Memory footprint: ~{model.get_memory_footprint() / 1024 / 1024:.0f} MB")
+    except AttributeError:
+        pass
     return model, tokenizer
 
 
