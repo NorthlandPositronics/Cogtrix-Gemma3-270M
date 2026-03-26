@@ -49,7 +49,7 @@ COPY src/ ./src/
 COPY --from=downloader /model ./data/model/
 
 ENV PATH=/home/appuser/.local/bin:$PATH
-ENV PYTHONPATH=/app/src:$PYTHONPATH
+ENV PYTHONPATH=/app/src
 ENV MODEL_PATH=/app/data/model
 ENV OMP_NUM_THREADS=4
 ENV MKL_NUM_THREADS=4
