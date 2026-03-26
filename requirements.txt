@@ -13,9 +13,6 @@ transformers>=4.50.0
 # Safetensors for efficient model loading
 safetensors>=0.5.0
 
-# Accelerate for device management and optimization
-accelerate>=1.0.0
-
 # Hugging Face hub for model downloads
 huggingface-hub>=0.28.0
 
