@@ -23,17 +23,8 @@ FROM python:3.11-slim AS downloader
 RUN pip install --no-cache-dir "huggingface-hub>=0.28.0"
 
 # HF_TOKEN is injected as a BuildKit secret — never stored in any image layer.
-# Uses the Python API directly to avoid PATH issues with huggingface-cli.
-RUN --mount=type=secret,id=hf_token \
-    python -c " \
-from huggingface_hub import snapshot_download; \
-token = open('/run/secrets/hf_token').read().strip(); \
-snapshot_download( \
-    'google/gemma-3-270m-it', \
-    local_dir='/model', \
-    token=token, \
-    ignore_patterns=['*.msgpack', '*.h5', '*.ot', 'flax_*', 'tf_*', 'rust_*'], \
-)"
+COPY docker/download_model.py /tmp/download_model.py
+RUN --mount=type=secret,id=hf_token python3 /tmp/download_model.py
 
 # Stage 3: Runtime — assemble the final image
 FROM python:3.11-slim AS runtime
