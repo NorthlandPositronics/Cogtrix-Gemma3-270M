@@ -76,12 +76,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Build and push
-        run: |
-          SHA="${{ github.sha }}"
-          TAG="ghcr.io/${{ env.IMAGE_NAME }}:${SHA::7}-${{ matrix.arch }}"
-          docker build -f docker/Dockerfile -t "${TAG}" .
-          docker push "${TAG}"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ghcr.io/${{ env.IMAGE_NAME }}:${{ env.SHORT_SHA }}-${{ matrix.arch }}
+          secrets: |
+            hf_token=${{ secrets.HF_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # 3. Publish multi-arch manifest
   publish-manifest:
@@ -105,11 +116,13 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Short SHA
+        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+
       - name: Create and push manifest
         run: |
           BASE="ghcr.io/${{ env.IMAGE_NAME }}"
-          SHA="${{ github.sha }}"
-          TAG="${SHA::7}"
+          TAG="${{ env.SHORT_SHA }}"
 
           docker manifest create "${BASE}:${TAG}" \
             "${BASE}:${TAG}-amd64" \
