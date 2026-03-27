@@ -20,6 +20,7 @@ import asyncio
 import json
 import platform
 import time
+import traceback
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator, List, Dict, Any, Optional
@@ -56,7 +57,7 @@ async def lifespan(app: FastAPI):
         if arch in ("arm64", "aarch64"):
             torch.backends.quantized.engine = "qnnpack"
         config = AutoConfig.from_pretrained(MODEL_PATH, trust_remote_code=True)
-        model = AutoModelForCausalLM.from_config(config)
+        model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
         # Apply the same quantize_dynamic transformation used at build time so
         # that the state-dict keys match before we load the weights.
         model = torch.quantization.quantize_dynamic(
@@ -176,11 +177,11 @@ def generate_response(
     do_sample: bool = False
 ) -> str:
     """Generate a response from the model."""
-    
+
     # Tokenize input
     inputs = tokenizer(prompt, return_tensors="pt").to("cpu")
     input_length = inputs["input_ids"].shape[1]
-    
+
     # temperature=0 means greedy decoding; do_sample requires temperature > 0
     use_sampling = temperature > 0.0 and temperature != 1.0
     gen_kwargs: dict = {
@@ -192,17 +193,22 @@ def generate_response(
         gen_kwargs["temperature"] = temperature
         gen_kwargs["top_k"] = top_k
         gen_kwargs["top_p"] = top_p
-    
+
     # Generate response
-    with torch.no_grad():
-        outputs = model.generate(**inputs, **gen_kwargs)
-    
+    try:
+        with torch.no_grad():
+            outputs = model.generate(**inputs, **gen_kwargs)
+    except Exception:
+        print("ERROR in model.generate():", flush=True)
+        traceback.print_exc()
+        raise
+
     # Decode response
     response = tokenizer.decode(
         outputs[0][input_length:],
         skip_special_tokens=True
     )
-    
+
     return response.strip()
 
 
