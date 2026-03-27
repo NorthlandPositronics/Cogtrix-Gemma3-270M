@@ -47,7 +47,6 @@ This project provides a complete solution for building and deploying a minimal c
 
 ### Utilities
 - `verify-project.sh` - Project verification script
-- `VERSION` - Version information
 
 ## Quick Start
 
