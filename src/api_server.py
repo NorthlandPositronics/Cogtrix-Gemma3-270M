@@ -58,6 +58,11 @@ async def lifespan(app: FastAPI):
             torch.backends.quantized.engine = "qnnpack"
         config = AutoConfig.from_pretrained(MODEL_PATH, trust_remote_code=True)
         model = AutoModelForCausalLM.from_config(config, trust_remote_code=True)
+        # quantize_dynamic requires float32 activations at runtime.
+        # from_config may produce a bfloat16 model (Gemma3 default dtype).
+        # Cast to float32 so all non-quantized ops (norms, embeddings, etc.)
+        # also run in float32, matching the build-time quantizer environment.
+        model = model.float()
         # Apply the same quantize_dynamic transformation used at build time so
         # that the state-dict keys match before we load the weights.
         model = torch.quantization.quantize_dynamic(
