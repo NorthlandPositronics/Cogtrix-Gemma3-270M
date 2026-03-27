@@ -22,6 +22,8 @@ This project builds a minimal container image for running the Gemma 3 270M LLM m
 ./scripts/build-llamacpp.sh
 # Override (optional):
 # GGUF_REPO=your/repo GGUF_VARIANT=Q4_K_S ./scripts/build-llamacpp.sh
+# Context window (default 4096) can be overridden at run time:
+# docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 gemma-3-270m-llamacpp
 ```
 
 ### Build for Specific Architecture
