@@ -8,14 +8,135 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  packages: write
 
 jobs:
   release-please:
+    name: Release Please
     runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+      version: ${{ steps.release.outputs.version }}
     steps:
       - name: Release Please
+        id: release
         uses: google-github-actions/release-please-action@v4
         with:
           config-file: .github/release-please-config.json
           manifest-file: .release-please-manifest.json
           release-type: simple
+
+  publish:
+    name: Publish Release Image (${{ matrix.arch }})
+    needs: [release-please]
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Lowercase image name
+        run: |
+          REPO="${{ github.repository }}"
+          echo "IMAGE_NAME=${REPO,,}" >> "$GITHUB_ENV"
+
+      - name: Derive image tags
+        run: |
+          echo "IMAGE_TAG=${{ needs.release-please.outputs.version }}" >> "$GITHUB_ENV"
+          echo "REF_TAG=${{ needs.release-please.outputs.tag_name }}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.llamacpp
+          push: true
+          tags: |
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}-${{ matrix.arch }}
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ env.REF_TAG }}-${{ matrix.arch }}
+            ghcr.io/${{ env.IMAGE_NAME }}:latest-${{ matrix.arch }}
+          secrets: |
+            hf_token=${{ secrets.HF_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish-manifest:
+    name: Publish Release Manifest
+    needs: [release-please, publish]
+    if: ${{ !cancelled() && needs.release-please.outputs.release_created == 'true' && needs.publish.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Lowercase image name
+        run: |
+          REPO="${{ github.repository }}"
+          echo "IMAGE_NAME=${REPO,,}" >> "$GITHUB_ENV"
+
+      - name: Derive image tags
+        run: |
+          echo "IMAGE_TAG=${{ needs.release-please.outputs.version }}" >> "$GITHUB_ENV"
+          echo "REF_TAG=${{ needs.release-please.outputs.tag_name }}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create and push manifest
+        run: |
+          BASE="ghcr.io/${{ env.IMAGE_NAME }}"
+          TAG="${{ env.IMAGE_TAG }}"
+          docker buildx imagetools create \
+            --tag "${BASE}:${TAG}" \
+            --tag "${BASE}:${{ env.REF_TAG }}" \
+            --tag "${BASE}:latest" \
+            "${BASE}:${TAG}-amd64" \
+            "${BASE}:${TAG}-arm64"
+
+  summary:
+    name: Release Summary
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [release-please, publish, publish-manifest]
+    steps:
+      - name: Post summary
+        run: |
+          echo "## Release Pipeline Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Check | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|-------|--------|" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Release Please | ${{ needs.release-please.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Publish release image | ${{ needs.publish.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Publish release manifest | ${{ needs.publish-manifest.result }} |" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release created: \`${{ needs.release-please.outputs.release_created }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Tag: \`${{ needs.release-please.outputs.tag_name }}\`" >> "$GITHUB_STEP_SUMMARY"
