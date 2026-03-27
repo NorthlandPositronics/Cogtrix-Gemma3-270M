@@ -3,6 +3,7 @@ name: CI – Quality & Docker
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -39,7 +40,7 @@ jobs:
           failure-threshold: error
 
   # ─────────────────────────────────────────────────────────────
-  # Publish jobs — run on push to main only.
+  # Publish jobs — run on tagged pushes (versioned releases).
   # ─────────────────────────────────────────────────────────────
 
   # 2. Publish per-arch images to GHCR
@@ -47,7 +48,7 @@ jobs:
   #    This job is skipped in CI — use `make build` locally to publish.
   publish:
     name: Publish (${{ matrix.arch }})
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     runs-on: ${{ matrix.runner }}
     continue-on-error: true
     permissions:
@@ -76,8 +77,12 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - name: Derive image tags
+        run: |
+          REF="${GITHUB_REF##*/}"
+          # strip leading v if present for image tag, keep v-tag for manifest
+          echo "IMAGE_TAG=${REF#v}" >> "$GITHUB_ENV"
+          echo "REF_TAG=${REF}" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -88,7 +93,9 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: ghcr.io/${{ env.IMAGE_NAME }}:${{ env.SHORT_SHA }}-${{ matrix.arch }}
+          tags: |
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}-${{ matrix.arch }}
+            ghcr.io/${{ env.IMAGE_NAME }}:${{ env.REF_TAG }}-${{ matrix.arch }}
           secrets: |
             hf_token=${{ secrets.HF_TOKEN }}
           cache-from: type=gha
@@ -116,8 +123,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Short SHA
-        run: echo "SHORT_SHA=${GITHUB_SHA::7}" >> "$GITHUB_ENV"
+      - name: Derive image tags
+        run: |
+          REF="${GITHUB_REF##*/}"
+          echo "IMAGE_TAG=${REF#v}" >> "$GITHUB_ENV"
+          echo "REF_TAG=${REF}" >> "$GITHUB_ENV"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -125,11 +135,10 @@ jobs:
       - name: Create and push manifest
         run: |
           BASE="ghcr.io/${{ env.IMAGE_NAME }}"
-          TAG="${{ env.SHORT_SHA }}"
-
+          TAG="${{ env.IMAGE_TAG }}"
           docker buildx imagetools create \
             --tag "${BASE}:${TAG}" \
-            --tag "${BASE}:latest" \
+            --tag "${BASE}:${{ env.REF_TAG }}" \
             "${BASE}:${TAG}-amd64" \
             "${BASE}:${TAG}-arm64"
 
