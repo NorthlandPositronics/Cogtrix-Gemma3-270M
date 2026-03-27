@@ -12,6 +12,10 @@ docker build --platform linux/amd64 -t gemma-3-270m-minimal .
 
 # Multi-arch build
 docker buildx build --platform linux/amd64,linux/arm64 -t gemma-3-270m-minimal --load .
+
+# Ultra-fast llama.cpp build (GGUF, CPU-only)
+./scripts/build-llamacpp.sh
+# (defaults to unsloth/gemma-3-270m-it-qat-GGUF, variant Q4_K_M)
 ```
 
 ### Run
@@ -24,6 +28,11 @@ docker run -it gemma-3-270m-minimal python inference.py --interactive
 
 # With GPU
 docker run --gpus all -it gemma-3-270m-minimal python inference.py --prompt "Hello"
+
+# OpenAI-compatible llama.cpp server (fast start)
+docker run -p 8080:8080 gemma-3-270m-llamacpp
+# Override GGUF at runtime if built that way:
+#   GGUF_REPO=... GGUF_VARIANT=Q4_K_S ./scripts/build-llamacpp.sh
 ```
 
 ## Common Parameters

@@ -16,6 +16,12 @@ This project builds a minimal container image for running the Gemma 3 270M LLM m
 
 ```bash
 ./scripts/build.sh
+
+# Faster-start llama.cpp variant (CPU-only, GGUF, OpenAI API)
+# Defaults: GGUF_REPO=unsloth/gemma-3-270m-it-qat-GGUF, GGUF_VARIANT=Q4_K_M
+./scripts/build-llamacpp.sh
+# Override (optional):
+# GGUF_REPO=your/repo GGUF_VARIANT=Q4_K_S ./scripts/build-llamacpp.sh
 ```
 
 ### Build for Specific Architecture

@@ -1,0 +1,59 @@
+# syntax=docker/dockerfile:1
+# Gemma 3 270M – CPU-only, ultra-fast start, OpenAI-compatible (llama.cpp)
+
+# ── Stage 1: build llama.cpp with OpenBLAS ───────────────────
+FROM debian:12-slim AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git ca-certificates wget libopenblas-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+RUN git clone --depth=1 https://github.com/ggerganov/llama.cpp
+
+WORKDIR /src/llama.cpp
+RUN cmake -S . -B build -DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS \
+ && cmake --build build --target llama-server -j"$(nproc)"
+
+# ── Stage 2: download GGUF (Q4_K_M) ──────────────────────────
+FROM python:3.11-slim AS downloader
+RUN pip install --no-cache-dir "huggingface-hub>=0.28.0"
+COPY docker/download_gguf.py /tmp/download_gguf.py
+RUN --mount=type=secret,id=hf_token python /tmp/download_gguf.py
+
+# ── Stage 3: runtime ─────────────────────────────────────────
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libopenblas0 libgomp1 ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid 1000 appgroup && \
+    useradd --uid 1000 --gid appgroup --create-home --shell /bin/bash appuser
+
+WORKDIR /app
+
+COPY --from=build /src/llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
+COPY --from=build /src/llama.cpp/build/bin/*.so /usr/local/lib/
+RUN for lib in libmtmd libllama libggml libggml-cpu libggml-base; do \
+      if [ -f "/usr/local/lib/${lib}.so" ]; then ln -sf "/usr/local/lib/${lib}.so" "/usr/local/lib/${lib}.so.0"; fi; \
+    done
+ENV LD_LIBRARY_PATH=/usr/local/lib:/lib:/usr/lib
+COPY --from=downloader /model /app/model
+
+USER appuser
+
+ENV OMP_NUM_THREADS=2
+ENV GGUF_REPO=unsloth/gemma-3-270m-it-qat-GGUF
+ENV GGUF_VARIANT=Q4_K_M
+ENV LLAMA_ARG_MODEL=/app/model/gemma-3-270m-q4_k_m.gguf
+ENV LLAMA_ARG_CTX_SIZE=2048
+ENV LLAMA_ARG_THREADS=2
+ENV LLAMA_ARG_BATCH=16
+ENV LLAMA_ARG_PARALLEL=2
+ENV LLAMA_ARG_PORT=8080
+ENV LLAMA_ARG_HOST=0.0.0.0
+
+EXPOSE 8080
+
+CMD ["sh", "-c", "llama-server --model ${LLAMA_ARG_MODEL} --ctx-size ${LLAMA_ARG_CTX_SIZE} --threads ${LLAMA_ARG_THREADS} --batch-size ${LLAMA_ARG_BATCH} --parallel ${LLAMA_ARG_PARALLEL} --port ${LLAMA_ARG_PORT} --host ${LLAMA_ARG_HOST}"]

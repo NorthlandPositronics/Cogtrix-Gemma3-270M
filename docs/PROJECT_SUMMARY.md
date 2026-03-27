@@ -16,9 +16,11 @@ This project provides a complete solution for building and deploying a minimal c
 ## Project Files
 
 ### Core Files
-- `Dockerfile` - Multi-stage Docker build definition
+- `docker/Dockerfile` - Multi-stage Docker build (PyTorch path)
+- `docker/Dockerfile.llamacpp` - Ultra-fast llama.cpp GGUF build (default: Unsloth QAT Q4_K_M)
 - `inference.py` - Main Python inference script
 - `scripts/build.sh` - Multi-architecture build script
+- `scripts/build-llamacpp.sh` - Build the llama.cpp image (CPU-only, OpenAI API)
 - `requirements.txt` - Python dependencies
 
 ### Documentation
