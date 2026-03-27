@@ -29,12 +29,14 @@ def main() -> None:
     original_mb = ORIGINAL.stat().st_size / 1024 / 1024
     print(f"Loading model ({original_mb:.0f} MB, bfloat16) for quantization…", flush=True)
 
-    # float32 is required by torch.quantization.quantize_dynamic
+    # float32 is required by torch.quantization.quantize_dynamic.
+    # device_map and low_cpu_mem_usage are omitted intentionally: both require
+    # accelerate / torch.distributed which are stripped from the builder stage
+    # to reduce image size.  The quantizer stage inherits from builder, so CPU
+    # is the only available device anyway.
     model = AutoModelForCausalLM.from_pretrained(
         str(MODEL_DIR),
         torch_dtype=torch.float32,
-        device_map="cpu",
-        low_cpu_mem_usage=True,
         trust_remote_code=True,
     )
 
