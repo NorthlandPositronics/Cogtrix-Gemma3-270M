@@ -7,6 +7,8 @@ Dockerfile
 docker/
 !docker/download_model.py
 !docker/quantize_model.py
+!docker/download_gguf.py
+!docker/Dockerfile.llamacpp
 
 # Documentation
 docs/

@@ -77,4 +77,4 @@ huggingface/
 .env
 .env.local
 .env.*.local
-
+AGENTS.md
