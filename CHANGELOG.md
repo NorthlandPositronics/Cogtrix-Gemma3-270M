@@ -1,7 +1,14 @@
 # Changelog
 
-## [1.1.0](https://github.com/NorthlandPositronics/Cogtrix-Gemma3-270M/compare/v1.0.0...v1.1.0) (unreleased)
+## 1.1.1 (2026-03-27)
 
-- add llama.cpp CPU-only image with Unsloth QAT GGUF default
-- faster startup (~1s) and docs update
-- version bump
+### Features
+
+- add the fast-start CPU-only `llama.cpp` image with baked-in Unsloth QAT GGUF weights
+- align CI/CD and image publishing around the `cogtrix-gemma3-270m` image name
+
+### Improvements
+
+- raise the default context window to 4096 and document `LLAMA_ARG_CTX_SIZE`
+- rename the primary image build script to `scripts/build-container-image.sh`
+- move the release-please config under `.github/` and point the workflow at the new path
