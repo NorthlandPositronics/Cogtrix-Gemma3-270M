@@ -90,11 +90,10 @@ docker run --rm gemma-3-270m-minimal python inference.py --prompt "Hello" --max-
 | File | Purpose |
 |------|---------|
 | `Dockerfile` | Multi-stage build definition |
-| `build.sh` | Build script with multi-arch support |
+| `build.sh` | Build script (tags :latest) |
 | `inference.py` | Main inference script |
 | `test_inference.py` | Verification tests |
 | `requirements.txt` | Python dependencies |
-| `Makefile` | Build automation |
 | `README.md` | Main documentation |
 | `BUILD.md` | Build instructions |
 

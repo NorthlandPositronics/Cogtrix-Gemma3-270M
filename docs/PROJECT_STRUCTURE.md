@@ -7,7 +7,7 @@
 ├── LICENSE                # MIT License with Gemma terms notice
 ├── docker/Dockerfile              # Multi-stage Dockerfile for PyTorch image
 ├── docker/Dockerfile.llamacpp     # Ultra-fast llama.cpp (GGUF) CPU-only image (Unsloth QAT by default)
-├── scripts/build.sh               # Build script for PyTorch image (multi-arch)
+├── scripts/build.sh               # Build script for PyTorch image (tags :latest)
 ├── scripts/build-llamacpp.sh      # Build script for llama.cpp image
 ├── src/inference.py               # Python inference script
 ├── src/api_server.py              # OpenAI-compatible FastAPI server

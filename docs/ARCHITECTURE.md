@@ -24,11 +24,8 @@ This project supports the following CPU architectures:
 # Direct build
 docker build --platform linux/amd64 -t gemma-3-270m:amd64 .
 
-# Using build script
+# Using build script (tags :latest)
 ./build.sh --platform linux/amd64
-
-# Using Makefile
-make build-amd64
 ```
 
 ### aarch64 (ARM64)
@@ -37,11 +34,8 @@ make build-amd64
 # Direct build
 docker build --platform linux/arm64 -t gemma-3-270m:arm64 .
 
-# Using build script
+# Using build script (tags :latest)
 ./build.sh --platform linux/arm64
-
-# Using Makefile
-make build-arm64
 ```
 
 ### Multi-Architecture Build
@@ -49,9 +43,6 @@ make build-arm64
 ```bash
 # Using build script
 ./build.sh --multiarch
-
-# Using Makefile
-make multiarch
 
 # Manual Docker Buildx
 docker buildx build \

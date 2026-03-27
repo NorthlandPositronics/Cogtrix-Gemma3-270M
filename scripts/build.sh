@@ -6,7 +6,7 @@ set -e
 # Requires HF_TOKEN env var to download model weights at build time.
 
 IMAGE_NAME="gemma-3-270m-minimal"
-VERSION=$(cat VERSION 2>/dev/null || echo "latest")
+VERSION="latest"
 ARCH=$(uname -m)
 
 case $ARCH in
