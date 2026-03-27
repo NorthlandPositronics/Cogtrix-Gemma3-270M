@@ -2,7 +2,7 @@
 # Download Gemma 3 270M model weights for local development (outside Docker).
 #
 # NOTE: The Docker image downloads its own weights at build time via BuildKit
-# secret — you do NOT need to run this script before `make build`.
+# secret — you do NOT need to run this script before `./scripts/build.sh`.
 # Use this only if you want to run inference.py or api_server.py directly
 # on the host (without Docker).
 

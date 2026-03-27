@@ -40,15 +40,14 @@ Thank you for your interest in contributing to this project!
 Before submitting a PR:
 
 ```bash
-# Build the image
-make build
+# Validate Python sources
+python -m compileall -q src/
 
-# Run tests
-make test
+# Verify expected project files
+./scripts/verify-project.sh
 
-# Test on different architectures
-make build-amd64
-make build-arm64
+# Build the fast-start image
+./scripts/build-container-image.sh
 ```
 
 ### Performance Considerations

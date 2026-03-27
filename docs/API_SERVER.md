@@ -1,10 +1,10 @@
 # OpenAI-Compatible API Server
 
-A FastAPI-based server providing an OpenAI-compatible REST API for the Gemma 3 270M model.
+A CPU-only OpenAI-compatible REST API for Gemma 3 270M. The primary runtime path is `llama.cpp` with a baked-in GGUF model; a legacy FastAPI/PyTorch server remains in the repo.
 
 ## Overview
 
-This API server exposes the Gemma 3 270M model via HTTP endpoints that are compatible with the OpenAI API specification. This allows you to:
+The primary server path exposes the Gemma 3 270M model via HTTP endpoints compatible with the OpenAI API specification. This allows you to:
 
 - Use the model with any OpenAI-compatible client
 - Integrate into existing applications expecting OpenAI API
@@ -16,15 +16,14 @@ This API server exposes the Gemma 3 270M model via HTTP endpoints that are compa
 ### Start the Server
 
 ```bash
-# Build the container first (if not done)
-./build.sh
+# Build the fast-start image first
+./scripts/build-container-image.sh
 
 # Start the API server
-docker run -d \
-  -p 8080:8080 \
-  -v ./model:/app/model \
-  gemma-3-270m-minimal \
-  python api_server.py --host 0.0.0.0 --port 8080
+docker run -d -p 8080:8080 cogtrix-gemma3-270m
+
+# Optional: override context size
+docker run -d -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 cogtrix-gemma3-270m
 ```
 
 ### Test the API
@@ -220,16 +219,15 @@ print(response.json()['choices'][0]['message']['content'])
 ### Basic Usage
 
 ```bash
-# Build the image
-./build.sh
+# Build the fast-start image
+./scripts/build-container-image.sh
 
 # Run the API server
 docker run -d \
   -p 8080:8080 \
-  -v ./model:/app/model \
   --name gemma-api \
-  gemma-3-270m-minimal \
-  python api_server.py --host 0.0.0.0 --port 8080
+  cogtrix-gemma3-270m \
+  sh -c 'llama-server --model $LLAMA_ARG_MODEL --ctx-size $LLAMA_ARG_CTX_SIZE --threads $LLAMA_ARG_THREADS --batch-size $LLAMA_ARG_BATCH --parallel $LLAMA_ARG_PARALLEL --port $LLAMA_ARG_PORT --host $LLAMA_ARG_HOST'
 ```
 
 ### Production Deployment
@@ -237,13 +235,12 @@ docker run -d \
 ```bash
 docker run -d \
   -p 8080:8080 \
-  -v ./model:/app/model \
   --restart unless-stopped \
   --memory 4g \
   --cpus 2 \
   --name gemma-api \
-  gemma-3-270m-minimal \
-  python api_server.py --host 0.0.0.0 --port 8080 --workers 2
+  cogtrix-gemma3-270m \
+  sh -c 'llama-server --model $LLAMA_ARG_MODEL --ctx-size $LLAMA_ARG_CTX_SIZE --threads $LLAMA_ARG_THREADS --batch-size $LLAMA_ARG_BATCH --parallel $LLAMA_ARG_PARALLEL --port $LLAMA_ARG_PORT --host $LLAMA_ARG_HOST'
 ```
 
 ## Testing
@@ -303,7 +300,7 @@ ls -la /path/to/model/
 **Issue:** Out of memory
 ```bash
 # Reduce max_tokens
-# Use CPU instead of GPU if needed
+# Lower LLAMA_ARG_CTX_SIZE if needed
 # Increase container memory limits
 ```
 

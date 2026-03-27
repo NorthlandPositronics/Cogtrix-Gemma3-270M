@@ -5,36 +5,33 @@
 ### Build
 ```bash
 # Quick build for current architecture
-docker build -t gemma-3-270m-minimal .
+docker build -t cogtrix-gemma3-270m .
 
 # Build for specific architecture
-docker build --platform linux/amd64 -t gemma-3-270m-minimal .
+docker build --platform linux/amd64 -t cogtrix-gemma3-270m .
 
 # Multi-arch build
-docker buildx build --platform linux/amd64,linux/arm64 -t gemma-3-270m-minimal --load .
+docker buildx build --platform linux/amd64,linux/arm64 -t cogtrix-gemma3-270m --load .
 
 # Ultra-fast llama.cpp build (GGUF, CPU-only)
-./scripts/build-llamacpp.sh
+./scripts/build-container-image.sh
 # (defaults to unsloth/gemma-3-270m-it-qat-GGUF, variant Q4_K_M)
 ```
 
 ### Run
 ```bash
 # Quick test
-docker run --rm gemma-3-270m-minimal python inference.py --prompt "Hello"
+docker run --rm cogtrix-gemma3-270m python inference.py --prompt "Hello"
 
 # Interactive mode
-docker run -it gemma-3-270m-minimal python inference.py --interactive
-
-# With GPU
-docker run --gpus all -it gemma-3-270m-minimal python inference.py --prompt "Hello"
+docker run -it cogtrix-gemma3-270m python inference.py --interactive
 
 # OpenAI-compatible llama.cpp server (fast start)
-docker run -p 8080:8080 gemma-3-270m-llamacpp
+docker run -p 8080:8080 cogtrix-gemma3-270m
 # Increase context (default 4096):
-#   docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 gemma-3-270m-llamacpp
+#   docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 cogtrix-gemma3-270m
 # Override GGUF at runtime if built that way:
-#   GGUF_REPO=... GGUF_VARIANT=Q4_K_S ./scripts/build-llamacpp.sh
+#   GGUF_REPO=... GGUF_VARIANT=Q4_K_S ./scripts/build-container-image.sh
 ```
 
 ## Common Parameters
@@ -60,11 +57,9 @@ docker run -p 8080:8080 gemma-3-270m-llamacpp
 
 | Component | Size |
 |-----------|------|
-| Base (python:3.11-alpine) | ~45 MB |
-| PyTorch | ~200-300 MB |
-| Transformers | ~100 MB |
-| Model Weights | ~536 MB |
-| **Total** | **~900 MB - 1 GB** |
+| llama.cpp runtime | lean native binary |
+| GGUF model (Q4_K_M) | ~235 MB class |
+| **Total** | much smaller than the PyTorch image |
 
 ## Troubleshooting Quick Fixes
 
@@ -74,25 +69,20 @@ docker run -p 8080:8080 gemma-3-270m-llamacpp
 # and have valid credentials
 ```
 
-**Issue**: CUDA not available
-```bash
-# Expected on CPU-only systems. Container auto-detects hardware.
-```
-
 **Issue**: Out of memory
 ```bash
-# Reduce --max-tokens parameter
-docker run --rm gemma-3-270m-minimal python inference.py --prompt "Hello" --max-tokens 50
+# Reduce context or generation size
+docker run -e LLAMA_ARG_CTX_SIZE=2048 -p 8080:8080 cogtrix-gemma3-270m
 ```
 
 ## File Reference
 
 | File | Purpose |
 |------|---------|
-| `Dockerfile` | Multi-stage build definition |
-| `build.sh` | Build script (tags :latest) |
-| `inference.py` | Main inference script |
-| `test_inference.py` | Verification tests |
+| `docker/Dockerfile` | Legacy PyTorch Dockerfile |
+| `docker/Dockerfile.llamacpp` | Primary fast-start Dockerfile |
+| `scripts/build.sh` | Legacy PyTorch build script |
+| `scripts/build-container-image.sh` | Primary llama.cpp build script |
 | `requirements.txt` | Python dependencies |
 | `README.md` | Main documentation |
 | `BUILD.md` | Build instructions |
@@ -101,19 +91,19 @@ docker run --rm gemma-3-270m-minimal python inference.py --prompt "Hello" --max-
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `MODEL_PATH` | Path to model directory | /app/model |
-| `HF_HOME` | Hugging Face cache directory | /app/.cache/huggingface |
-| `TORCH_HOME` | PyTorch cache directory | /app/.cache/torch |
+| `LLAMA_ARG_CTX_SIZE` | Runtime context window | 4096 |
+| `GGUF_REPO` | Build-time GGUF repository override | unsloth/gemma-3-270m-it-qat-GGUF |
+| `GGUF_VARIANT` | Build-time GGUF quantization override | Q4_K_M |
 
 ## Performance Tips
 
-1. **GPU**: Use `--gpus all` flag for GPU acceleration
-2. **Sampling**: Use `--do-sample` for more diverse outputs
-3. **Temperature**: Lower values (0.3-0.5) for more deterministic outputs
-4. **Max tokens**: Adjust based on your needs to save memory
+1. **Context**: Lower `LLAMA_ARG_CTX_SIZE` if you need less RAM or faster cold start.
+2. **Threads**: Keep `LLAMA_ARG_THREADS=2` on GitHub-hosted 2 vCPU runners.
+3. **Quantization**: Keep `Q4_K_M` unless you have measured a better tradeoff.
+4. **Batch size**: Reduce `LLAMA_ARG_BATCH` if you see memory pressure.
 
 ## Security Notes
 
-- Container runs as non-root user (appuser:appgroup)
-- No external network access needed (model baked in)
-- Minimal attack surface (Alpine base)
+- Container runs as non-root user (`appuser:appgroup`)
+- No external network access needed at runtime (model baked in)
+- Minimal runtime surface

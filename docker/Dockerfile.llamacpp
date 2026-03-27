@@ -1,6 +1,10 @@
 # syntax=docker/dockerfile:1
 # Gemma 3 270M – CPU-only, ultra-fast start, OpenAI-compatible (llama.cpp)
 
+ARG GGUF_REPO=unsloth/gemma-3-270m-it-qat-GGUF
+ARG GGUF_VARIANT=Q4_K_M
+ARG LLAMA_ARG_CTX_SIZE=4096
+
 # ── Stage 1: build llama.cpp with OpenBLAS ───────────────────
 FROM debian:12-slim AS build
 
@@ -17,12 +21,19 @@ RUN cmake -S . -B build -DLLAMA_BLAS=ON -DLLAMA_BLAS_VENDOR=OpenBLAS \
 
 # ── Stage 2: download GGUF (Q4_K_M) ──────────────────────────
 FROM python:3.11-slim AS downloader
+ARG GGUF_REPO
+ARG GGUF_VARIANT
+ENV GGUF_REPO=${GGUF_REPO}
+ENV GGUF_VARIANT=${GGUF_VARIANT}
 RUN pip install --no-cache-dir "huggingface-hub>=0.28.0"
 COPY docker/download_gguf.py /tmp/download_gguf.py
 RUN --mount=type=secret,id=hf_token python /tmp/download_gguf.py
 
 # ── Stage 3: runtime ─────────────────────────────────────────
 FROM debian:12-slim
+ARG GGUF_REPO
+ARG GGUF_VARIANT
+ARG LLAMA_ARG_CTX_SIZE
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libopenblas0 libgomp1 ca-certificates \
@@ -44,10 +55,10 @@ COPY --from=downloader /model /app/model
 USER appuser
 
 ENV OMP_NUM_THREADS=2
-ENV GGUF_REPO=unsloth/gemma-3-270m-it-qat-GGUF
-ENV GGUF_VARIANT=Q4_K_M
-ENV LLAMA_ARG_MODEL=/app/model/gemma-3-270m-q4_k_m.gguf
-ENV LLAMA_ARG_CTX_SIZE=4096
+ENV GGUF_REPO=${GGUF_REPO}
+ENV GGUF_VARIANT=${GGUF_VARIANT}
+ENV LLAMA_ARG_MODEL=/app/model/current-model.gguf
+ENV LLAMA_ARG_CTX_SIZE=${LLAMA_ARG_CTX_SIZE}
 ENV LLAMA_ARG_THREADS=2
 ENV LLAMA_ARG_BATCH=16
 ENV LLAMA_ARG_PARALLEL=2
