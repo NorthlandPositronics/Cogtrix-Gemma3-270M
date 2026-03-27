@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/NorthlandPositronics/Cogtrix-Gemma3-270M/compare/v1.1.1...v1.2.0) (2026-03-27)
+
+
+### Features
+
+* tune llama.cpp runtime defaults ([bc4bf1a](https://github.com/NorthlandPositronics/Cogtrix-Gemma3-270M/commit/bc4bf1a3e120fc0f766473f82af30273c236793e))
+
 ## 1.1.1 (2026-03-27)
 
 ### Features
