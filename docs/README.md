@@ -41,19 +41,17 @@ curl http://localhost:8080/v1/chat/completions \
 .
 ├── build.sh                 # Build script for multi-architecture images
 ├── requirements.txt         # Python dependencies
-├── Makefile               # Build automation
-├── VERSION                # Project version
 ├── .github/               # GitHub Actions workflows
 ├── .gitignore            # Git ignore rules
 ├── .dockerignore         # Docker ignore rules
 ├── docker/               # Docker-related files
-│   └── Dockerfile        # Multi-stage Dockerfile
+│   ├── Dockerfile        # Multi-stage Dockerfile
+│   └── Dockerfile.llamacpp # Fast-start llama.cpp image
 ├── src/                  # Source code
 │   ├── inference.py      # Direct inference script
 │   ├── api_server.py     # OpenAI-compatible API server
 │   ├── api_server_mock.py # Mock API for testing
 │   ├── test_inference.py # Inference tests
-│   └── setup-permissions.sh # Permission setup script
 ├── docs/                 # Documentation
 │   ├── README.md         # This file
 │   ├── API_REFERENCE.md  # API documentation
