@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/NorthlandPositronics/Cogtrix-Gemma3-270M/compare/v1.2.0...v1.2.1) (2026-03-27)
+
+
+### Bug Fixes
+
+* **ci:** publish release images from release workflow ([e8b29e8](https://github.com/NorthlandPositronics/Cogtrix-Gemma3-270M/commit/e8b29e866d7c9be5139c2de481d81f9b1997fa87))
+
 ## [1.2.0](https://github.com/NorthlandPositronics/Cogtrix-Gemma3-270M/compare/v1.1.1...v1.2.0) (2026-03-27)
 
 
