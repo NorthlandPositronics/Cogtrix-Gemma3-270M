@@ -53,7 +53,6 @@ curl http://localhost:8080/v1/chat/completions \
 .
 ├── build.sh                 # Build script (tags :latest)
 ├── requirements.txt         # Python dependencies
-├── VERSION                # Project version (used by release-please)
 ├── .github/               # GitHub Actions workflows
 ├── .gitignore            # Git ignore rules
 ├── .dockerignore         # Docker ignore rules
