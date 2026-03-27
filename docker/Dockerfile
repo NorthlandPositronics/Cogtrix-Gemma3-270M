@@ -20,22 +20,18 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user --no-compile -r requirements.txt
 
 # Remove files not needed at inference time.
-# Only strips items that are NOT imported by torch.__init__ at module level.
-# torch>=2.4 imports many subpackages unconditionally (ao, distributed, _dynamo,
-# _inductor, onnx, ...) so stripping them causes an ImportError on 'import torch'.
-# Safe to remove:
-#   torch/test/         77 MB  pure test suite (never imported at runtime)
-#   torch/include/      51 MB  C++ headers (only needed for building extensions)
-#   test *.so           ~1 MB  test-only shared libraries
-#   accelerate           4 MB  not used by this project
-#   *.dist-info         15 MB  pip metadata (unused at runtime)
+# ONLY strip items that are provably never imported or needed at runtime.
+# torch>=2.4 imports many subpackages at module level AND transformers uses
+# importlib.metadata (*.dist-info) for version checks — stripping either
+# breaks startup.  The only truly safe removals are:
+#   torch/test/    77 MB  pure test suite, never imported
+#   torch/include/ 51 MB  C++ headers, only for building extensions
+#   test *.so      ~1 MB  test-only shared libraries
 RUN SITE=/root/.local/lib/python3.11/site-packages && \
     rm -rf  "$SITE/torch/test" \
             "$SITE/torch/include" \
             "$SITE/torch/lib/libtorchbind_test.so" \
-            "$SITE/torch/lib/libjitbackend_test.so" \
-            "$SITE/accelerate" && \
-    find /root/.local -name "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || true
+            "$SITE/torch/lib/libjitbackend_test.so"
 
 # ── Stage 2: downloader ──────────────────────────────────────
 # Fetch model weights via HF token (secret never stored in any image layer).
