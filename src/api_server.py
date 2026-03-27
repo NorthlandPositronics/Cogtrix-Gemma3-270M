@@ -20,13 +20,14 @@ import asyncio
 import json
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator, List, Dict, Any, Optional
 
 import torch
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
 
 # Model configuration
 MODEL_PATH = "/app/data/model"
@@ -42,25 +43,36 @@ async def lifespan(app: FastAPI):
     """Load model at startup."""
     global model, tokenizer
     
-    print("Loading Gemma 3 270M model on CPU...")
-    
-    # Load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained(
-        MODEL_PATH,
-        trust_remote_code=True
-    )
-    
-    # Load model optimized for CPU
-    model = AutoModelForCausalLM.from_pretrained(
-        MODEL_PATH,
-        torch_dtype=torch.float32,
-        device_map="cpu",
-        low_cpu_mem_usage=True,
-        trust_remote_code=True
-    )
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, trust_remote_code=True)
+
+    quantized = Path(MODEL_PATH) / "model_quantized.pt"
+    if quantized.exists():
+        print("Loading INT8-quantized model on CPU...")
+        config = AutoConfig.from_pretrained(MODEL_PATH, trust_remote_code=True)
+        model = AutoModelForCausalLM.from_config(config)
+        # Apply the same quantize_dynamic transformation used at build time so
+        # that the state-dict keys match before we load the weights.
+        model = torch.quantization.quantize_dynamic(
+            model, {torch.nn.Linear}, dtype=torch.qint8
+        )
+        # weights_only=False is required for quantized (qint8) tensor objects
+        state_dict = torch.load(str(quantized), map_location="cpu", weights_only=False)
+        model.load_state_dict(state_dict)
+    else:
+        print("Loading Gemma 3 270M model on CPU...")
+        model = AutoModelForCausalLM.from_pretrained(
+            MODEL_PATH,
+            torch_dtype=torch.bfloat16,
+            device_map="cpu",
+            low_cpu_mem_usage=True,
+            trust_remote_code=True,
+        )
     model.eval()
-    
-    print(f"✓ Model loaded successfully! (Memory: {model.get_memory_footprint() / 1024 / 1024:.0f} MB)")
+
+    try:
+        print(f"✓ Model loaded! Memory: {model.get_memory_footprint() / 1024 / 1024:.0f} MB")
+    except AttributeError:
+        print("✓ Model loaded successfully!")
     yield
 
 

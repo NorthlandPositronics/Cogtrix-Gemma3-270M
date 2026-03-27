@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
 # ============================================
 # Gemma 3 270M Minimal Container (CPU-Only)
-# Optimized for minimal image size - CPU inference only
+# 4-stage build optimised for minimal image size
 # ============================================
 
-# Stage 1: Builder — install Python deps
+# ── Stage 1: builder ─────────────────────────────────────────
+# Install Python dependencies, then strip unused torch modules.
 FROM python:3.11-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -15,18 +16,54 @@ WORKDIR /build
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir --user -r requirements.txt
+# --no-compile skips .pyc generation at install time (~200 MB saved)
+RUN pip install --no-cache-dir --user --no-compile -r requirements.txt
 
-# Stage 2: Model downloader — fetch weights using HF token (never baked into final image)
+# Remove files not needed at inference time.
+# Savings (approximate):
+#   torch/test/         77 MB  test suite
+#   torch/include/      51 MB  C++ headers (extension builds only)
+#   torch/distributed/   9 MB  multi-node training
+#   torch/_dynamo/       4 MB  torch.compile front-end
+#   torch/_inductor/     8 MB  torch.compile back-end
+#   torch/ao/            5 MB  quantisation-aware ops
+#   torch/onnx/          4 MB  ONNX export
+#   test *.so           ~1 MB  test-only shared libs
+#   accelerate           4 MB  not imported by this project
+#   *.dist-info         15 MB  pip metadata (unused at runtime)
+RUN SITE=/root/.local/lib/python3.11/site-packages && \
+    rm -rf  "$SITE/torch/test" \
+            "$SITE/torch/include" \
+            "$SITE/torch/distributed" \
+            "$SITE/torch/_dynamo" \
+            "$SITE/torch/_inductor" \
+            "$SITE/torch/ao" \
+            "$SITE/torch/onnx" \
+            "$SITE/torch/lib/libtorchbind_test.so" \
+            "$SITE/torch/lib/libjitbackend_test.so" \
+            "$SITE/accelerate" && \
+    find /root/.local -name "*.dist-info" -type d -exec rm -rf {} + 2>/dev/null || true
+
+# ── Stage 2: downloader ──────────────────────────────────────
+# Fetch model weights via HF token (secret never stored in any image layer).
 FROM python:3.11-slim AS downloader
 
 RUN pip install --no-cache-dir "huggingface-hub>=0.28.0"
 
-# HF_TOKEN is injected as a BuildKit secret — never stored in any image layer.
 COPY docker/download_model.py /tmp/download_model.py
 RUN --mount=type=secret,id=hf_token python3 /tmp/download_model.py
 
-# Stage 3: Runtime — assemble the final image
+# ── Stage 3: quantizer ───────────────────────────────────────
+# Apply dynamic INT8 quantization to halve the on-disk model size.
+# Reuses the already-slimmed builder environment (torch + transformers present).
+FROM builder AS quantizer
+
+COPY --from=downloader /model /model
+COPY docker/quantize_model.py /tmp/quantize_model.py
+RUN python3 /tmp/quantize_model.py
+
+# ── Stage 4: runtime ─────────────────────────────────────────
+# Assemble the final image from slimmed packages and quantized model.
 FROM python:3.11-slim AS runtime
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -39,25 +76,22 @@ RUN groupadd --gid 1000 appgroup && \
 
 WORKDIR /app
 
-# Copy Python packages from builder
-COPY --from=builder /root/.local /home/appuser/.local
-
-# Copy source code
-COPY src/ ./src/
-
-# Copy model weights from downloader stage
-COPY --from=downloader /model ./data/model/
+# --chown on COPY eliminates the separate RUN chown layer that previously
+# duplicated ~575 MB of model data as a new image layer.
+COPY --from=builder  --chown=appuser:appgroup /root/.local /home/appuser/.local
+COPY                 --chown=appuser:appgroup src/         ./src/
+COPY --from=quantizer --chown=appuser:appgroup /model      ./data/model/
 
 ENV PATH=/home/appuser/.local/bin:$PATH
 ENV PYTHONPATH=/app/src
 ENV MODEL_PATH=/app/data/model
 ENV OMP_NUM_THREADS=4
 ENV MKL_NUM_THREADS=4
-
-RUN chown -R appuser:appgroup /app
+# Prevent Python from writing .pyc files into the container filesystem at runtime
+ENV PYTHONDONTWRITEBYTECODE=1
 
 USER appuser
 
 EXPOSE 8080
 
-CMD ["python", "src/inference.py"]
+CMD ["python", "src/api_server.py"]
