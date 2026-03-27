@@ -23,7 +23,6 @@ RUN pip install --no-cache-dir --user --no-compile -r requirements.txt
 # Savings (approximate):
 #   torch/test/         77 MB  test suite
 #   torch/include/      51 MB  C++ headers (extension builds only)
-#   torch/distributed/   9 MB  multi-node training
 #   torch/_dynamo/       4 MB  torch.compile front-end
 #   torch/_inductor/     8 MB  torch.compile back-end
 #   torch/ao/            5 MB  quantisation-aware ops
@@ -31,10 +30,12 @@ RUN pip install --no-cache-dir --user --no-compile -r requirements.txt
 #   test *.so           ~1 MB  test-only shared libs
 #   accelerate           4 MB  not imported by this project
 #   *.dist-info         15 MB  pip metadata (unused at runtime)
+# NOTE: torch/distributed is NOT removed — torch>=2.4 imports it transitively
+# via torch/utils/data/dataloader.py during 'import torch', so removing it
+# causes an immediate ImportError at startup (both in the quantizer and runtime).
 RUN SITE=/root/.local/lib/python3.11/site-packages && \
     rm -rf  "$SITE/torch/test" \
             "$SITE/torch/include" \
-            "$SITE/torch/distributed" \
             "$SITE/torch/_dynamo" \
             "$SITE/torch/_inductor" \
             "$SITE/torch/ao" \
