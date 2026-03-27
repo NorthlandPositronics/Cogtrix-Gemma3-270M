@@ -20,26 +20,18 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --user --no-compile -r requirements.txt
 
 # Remove files not needed at inference time.
-# Savings (approximate):
-#   torch/test/         77 MB  test suite
-#   torch/include/      51 MB  C++ headers (extension builds only)
-#   torch/_dynamo/       4 MB  torch.compile front-end
-#   torch/_inductor/     8 MB  torch.compile back-end
-#   torch/ao/            5 MB  quantisation-aware ops
-#   torch/onnx/          4 MB  ONNX export
-#   test *.so           ~1 MB  test-only shared libs
-#   accelerate           4 MB  not imported by this project
+# Only strips items that are NOT imported by torch.__init__ at module level.
+# torch>=2.4 imports many subpackages unconditionally (ao, distributed, _dynamo,
+# _inductor, onnx, ...) so stripping them causes an ImportError on 'import torch'.
+# Safe to remove:
+#   torch/test/         77 MB  pure test suite (never imported at runtime)
+#   torch/include/      51 MB  C++ headers (only needed for building extensions)
+#   test *.so           ~1 MB  test-only shared libraries
+#   accelerate           4 MB  not used by this project
 #   *.dist-info         15 MB  pip metadata (unused at runtime)
-# NOTE: torch/distributed is NOT removed — torch>=2.4 imports it transitively
-# via torch/utils/data/dataloader.py during 'import torch', so removing it
-# causes an immediate ImportError at startup (both in the quantizer and runtime).
 RUN SITE=/root/.local/lib/python3.11/site-packages && \
     rm -rf  "$SITE/torch/test" \
             "$SITE/torch/include" \
-            "$SITE/torch/_dynamo" \
-            "$SITE/torch/_inductor" \
-            "$SITE/torch/ao" \
-            "$SITE/torch/onnx" \
             "$SITE/torch/lib/libtorchbind_test.so" \
             "$SITE/torch/lib/libjitbackend_test.so" \
             "$SITE/accelerate" && \
