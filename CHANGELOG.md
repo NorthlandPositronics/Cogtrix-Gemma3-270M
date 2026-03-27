@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/NorthlandPositronics/Cogtrix-Gemma3-270M/compare/v1.0.0...v1.0.1) (2026-03-27)
+
+
+### Bug Fixes
+
+* **release:** restore release-please baseline to 1.1.1 ([3b67bba](https://github.com/NorthlandPositronics/Cogtrix-Gemma3-270M/commit/3b67bbac0e5e180848e6a454ac7fc6a0970564af))
+
 ## 1.1.1 (2026-03-27)
 
 ### Features
