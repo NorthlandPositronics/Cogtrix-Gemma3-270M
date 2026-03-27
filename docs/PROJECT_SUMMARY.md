@@ -35,6 +35,7 @@ This project provides a complete solution for building and deploying a minimal c
 ### Configuration
 - `.dockerignore` - Docker build exclusions
 - `.gitignore` - Git ignore patterns
+- `Makefile` - Build automation
 - `LICENSE` - MIT License with Gemma terms
 
 ### Testing
