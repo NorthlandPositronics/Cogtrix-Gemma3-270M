@@ -7,7 +7,14 @@ A minimal Docker container for running the Gemma 3 270M LLM model with OpenAI-co
 ### Build the Image
 
 ```bash
+# PyTorch-based image (current default)
 ./scripts/build.sh
+
+# Ultra-fast startup (llama.cpp + GGUF, CPU-only, OpenAI-compatible)
+# Defaults to Unsloth QAT GGUF (unsloth/gemma-3-270m-it-qat-GGUF, Q4_K_M)
+./scripts/build-llamacpp.sh
+# Override GGUF repo/variant if needed:
+# GGUF_REPO=some/other-repo GGUF_VARIANT=Q4_K_S ./scripts/build-llamacpp.sh
 ```
 
 ### Run the Container
@@ -15,6 +22,9 @@ A minimal Docker container for running the Gemma 3 270M LLM model with OpenAI-co
 ```bash
 # CPU-only mode
 docker run -it gemma-3-270m-minimal python src/inference.py --prompt "Hello"
+
+# llama.cpp OpenAI server (fast startup, CPU-only, Unsloth QAT GGUF baked in)
+docker run -p 8080:8080 gemma-3-270m-llamacpp
 
 # Interactive mode
 docker run -it gemma-3-270m-minimal python src/inference.py --interactive
@@ -73,6 +83,7 @@ curl http://localhost:8080/v1/chat/completions \
 ## 🔧 Features
 
 - **Minimal Image Size**: ~900MB - 1GB optimized container
+- **Fast-Start Variant**: llama.cpp + GGUF image starts in seconds on 2 vCPU runners
 - **Multi-Architecture**: Supports x86_64 and aarch64
 - **CPU & GPU**: Runs on both CPU and GPU (CUDA)
 - **OpenAI-Compatible API**: Drop-in replacement for OpenAI API

@@ -5,12 +5,15 @@
 ├── README.md              # Main documentation
 ├── BUILD.md               # Build instructions and architecture support
 ├── LICENSE                # MIT License with Gemma terms notice
-├── Dockerfile             # Multi-stage Dockerfile for minimal image
-├── scripts/build.sh               # Build script with multi-arch support
-├── inference.py           # Python inference script
-├── requirements.txt       # Python dependencies
-├── .dockerignore          # Files to exclude from Docker build
-└── .gitignore             # Git ignore file
+├── docker/Dockerfile              # Multi-stage Dockerfile for PyTorch image
+├── docker/Dockerfile.llamacpp     # Ultra-fast llama.cpp (GGUF) CPU-only image (Unsloth QAT by default)
+├── scripts/build.sh               # Build script for PyTorch image (multi-arch)
+├── scripts/build-llamacpp.sh      # Build script for llama.cpp image
+├── src/inference.py               # Python inference script
+├── src/api_server.py              # OpenAI-compatible FastAPI server
+├── requirements.txt               # Python dependencies (PyTorch path)
+├── .dockerignore                  # Files to exclude from Docker build
+└── .gitignore                     # Git ignore file
 ```
 
 ## File Descriptions
@@ -34,8 +37,8 @@
 
 ✅ Minimal image size (~900MB - 1GB)  
 ✅ Multi-architecture support (x86_64, aarch64)  
-✅ CPU and GPU inference  
-✅ Model weights baked into image  
-✅ No external dependencies (Ollama, llama.cpp)  
+✅ CPU-only inference (PyTorch or llama.cpp)  
+✅ Model weights baked into image (safetensors or GGUF; default GGUF from Unsloth QAT)  
+✅ OpenAI-compatible API endpoints  
 ✅ Security-focused (non-root user)  
 ✅ Production-ready  
