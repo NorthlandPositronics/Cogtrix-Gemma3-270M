@@ -10,6 +10,7 @@ The inference code (inference.py / api_server.py) automatically detects
 model_quantized.pt and loads the quantized model at runtime.
 """
 
+import platform
 import sys
 from pathlib import Path
 
@@ -36,9 +37,17 @@ def main() -> None:
     # is the only available device anyway.
     model = AutoModelForCausalLM.from_pretrained(
         str(MODEL_DIR),
-        torch_dtype=torch.float32,
+        dtype=torch.float32,
         trust_remote_code=True,
     )
+
+    # fbgemm is the default x86 backend; ARM64 requires qnnpack.
+    # Both backends support quantize_dynamic but serialize weights differently,
+    # so the backend must match between build time and runtime.
+    arch = platform.machine().lower()
+    if arch in ("arm64", "aarch64"):
+        torch.backends.quantized.engine = "qnnpack"
+        print(f"Using qnnpack quantization backend (arch={arch})", flush=True)
 
     print("Applying dynamic INT8 quantization to nn.Linear layers…", flush=True)
     model = torch.quantization.quantize_dynamic(

@@ -18,6 +18,7 @@ Usage:
 
 import asyncio
 import json
+import platform
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -48,6 +49,12 @@ async def lifespan(app: FastAPI):
     quantized = Path(MODEL_PATH) / "model_quantized.pt"
     if quantized.exists():
         print("Loading INT8-quantized model on CPU...")
+        # Match the backend used at quantization build time: qnnpack on ARM64,
+        # fbgemm (default) on x86.  The serialized packed weights are
+        # backend-specific, so this must agree with quantize_model.py.
+        arch = platform.machine().lower()
+        if arch in ("arm64", "aarch64"):
+            torch.backends.quantized.engine = "qnnpack"
         config = AutoConfig.from_pretrained(MODEL_PATH, trust_remote_code=True)
         model = AutoModelForCausalLM.from_config(config)
         # Apply the same quantize_dynamic transformation used at build time so
