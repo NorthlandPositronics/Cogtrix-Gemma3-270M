@@ -2,26 +2,26 @@
 
 ## Overview
 
-This project provides a complete solution for building and deploying a minimal container image optimized for running the Gemma 3 270M LLM model. The image is designed to be small, fast, and support both CPU and GPU inference across multiple architectures.
+This project provides a container image optimized for CI validation runs with Gemma 3 270M. The primary path is a CPU-only, OpenAI-compatible llama.cpp image using a baked-in GGUF model for fast startup, low memory use, and predictable inference on small GitHub runners.
 
 ## Key Features
 
-✅ **Minimal Size**: Optimized to ~900MB-1GB total image size  
-✅ **Multi-Architecture**: Supports x86_64 and aarch64  
-✅ **Dual Inference**: CPU and GPU support in a single image  
-✅ **Baked Model**: Model weights included (~536MB)  
-✅ **Production Ready**: Complete with tests, docs, and CI/CD  
-✅ **No Heavy Dependencies**: No ollama or llama.cpp required  
+✅ **Fast Start**: About a second to readiness on a 2 vCPU runner
+✅ **Multi-Architecture**: Supports x86_64 and aarch64
+✅ **CPU Only**: No GPU runtime path in the optimized image
+✅ **Baked Model**: GGUF weights included in the image
+✅ **Production Ready**: Complete with tests, docs, and CI/CD
+✅ **Lean Runtime**: llama.cpp path avoids heavy PyTorch startup costs
 
 ## Project Files
 
 ### Core Files
-- `docker/Dockerfile` - Multi-stage Docker build (PyTorch path)
-- `docker/Dockerfile.llamacpp` - Ultra-fast llama.cpp GGUF build (default: Unsloth QAT Q4_K_M)
-- `inference.py` - Main Python inference script
-- `scripts/build.sh` - Multi-architecture build script
-- `scripts/build-llamacpp.sh` - Build the llama.cpp image (CPU-only, OpenAI API)
-- `requirements.txt` - Python dependencies
+- `docker/Dockerfile` - Legacy PyTorch-based Docker build
+- `docker/Dockerfile.llamacpp` - Primary fast-start llama.cpp GGUF build
+- `src/inference.py` - Python inference script for the PyTorch path
+- `scripts/build.sh` - Legacy PyTorch image build script (`:latest`)
+- `scripts/build-container-image.sh` - Build the llama.cpp image (CPU-only, OpenAI API)
+- `requirements.txt` - Python dependencies for the PyTorch path
 
 ### Documentation
 - `README.md` - Main project documentation
@@ -41,12 +41,14 @@ This project provides a complete solution for building and deploying a minimal c
 - `test_inference.py` - Verification test suite
 
 ### GitHub Integration
-- `.github/workflows/docker-build.yml` - CI/CD pipeline
+- `.github/workflows/ci.yml` - CI and image publishing pipeline
+- `.github/workflows/release-please.yml` - release-please automation
 - `.github/ISSUE_TEMPLATE/bug_report.md` - Bug report template
 - `.github/ISSUE_TEMPLATE/feature_request.md` - Feature request template
 
 ### Utilities
 - `verify-project.sh` - Project verification script
+- `.release-please-manifest.json` - Release version manifest
 
 ## Quick Start
 
@@ -66,13 +68,13 @@ This project provides a complete solution for building and deploying a minimal c
 ### Run
 ```bash
 # Basic inference
-docker run -it gemma-3-270m-minimal python inference.py --prompt "Hello"
+docker run -it cogtrix-gemma3-270m python inference.py --prompt "Hello"
 
 # Interactive mode
-docker run -it gemma-3-270m-minimal python inference.py --interactive
+docker run -it cogtrix-gemma3-270m python inference.py --interactive
 
-# With GPU
-docker run --gpus all -it gemma-3-270m-minimal python inference.py --interactive
+# Fast-start OpenAI-compatible server
+docker run -p 8080:8080 cogtrix-gemma3-270m
 ```
 
 ## Technical Specifications
@@ -80,37 +82,32 @@ docker run --gpus all -it gemma-3-270m-minimal python inference.py --interactive
 ### Image Composition
 | Component | Size |
 |-----------|------|
-| Base (python:3.11-alpine) | ~45 MB |
-| PyTorch (CPU+GPU) | ~200-300 MB |
-| Transformers | ~100 MB |
-| Gemma 3 270M Weights | ~536 MB |
-| **Total** | **~900 MB - 1 GB** |
+| llama.cpp runtime | lean native binary |
+| GGUF model (Q4_K_M) | ~235 MB class |
+| **Total** | much smaller than the legacy PyTorch image |
 
 ### Supported Platforms
 - **x86_64**: Linux, Windows (WSL2), macOS (Intel)
 - **aarch64**: Linux (ARM), macOS (Apple Silicon), AWS Graviton
 
 ### Dependencies
-- Python 3.11
-- PyTorch 2.4.0 (CPU + CUDA)
-- Transformers 4.44.2
-- Safetensors 0.4.5
-- Accelerate 0.33.0
+- llama.cpp
+- GGUF model weights
+- OpenBLAS runtime
+- Python 3.11 only for helper tooling / legacy path
 
 ## Performance
 
 | Platform | Architecture | Tokens/Second |
 |----------|-------------|---------------|
-| CPU (4 cores) | x86_64 | 5-10 |
-| CPU (8 cores) | x86_64 | 10-15 |
-| GPU (RTX 3060) | x86_64 | 50-80 |
-| Apple M1/M2 | aarch64 | 15-35 |
+| 2 vCPU runner-class host | x86_64 | ~73 |
+| Apple M1/M2 | aarch64 | workload-dependent |
 
 ## Usage Examples
 
 ### Simple Inference
 ```bash
-docker run --rm gemma-3-270m-minimal \
+docker run --rm cogtrix-gemma3-270m \
   python inference.py \
   --prompt "Explain quantum computing" \
   --max-tokens 100 \
@@ -119,13 +116,7 @@ docker run --rm gemma-3-270m-minimal \
 
 ### Interactive Mode
 ```bash
-docker run -it gemma-3-270m-minimal \
-  python inference.py --interactive
-```
-
-### GPU Acceleration
-```bash
-docker run --gpus all -it gemma-3-270m-minimal \
+docker run -it cogtrix-gemma3-270m \
   python inference.py --interactive
 ```
 
@@ -134,7 +125,7 @@ docker run --gpus all -it gemma-3-270m-minimal \
 1. **Local**: Docker Desktop, Docker Engine
 2. **Cloud**: AWS EC2, GCP, Azure
 3. **Kubernetes**: GKE, EKS, AKS
-4. **Edge**: Raspberry Pi, NVIDIA Jetson
+4. **Edge**: Raspberry Pi and other ARM edge devices
 5. **Serverless**: Cloud Run, AWS Lambda (with limitations)
 
 ## Security
@@ -149,7 +140,7 @@ docker run --gpus all -it gemma-3-270m-minimal \
 
 ```bash
 # Run test suite inside container
-docker run --rm gemma-3-270m-minimal python test_inference.py
+docker run --rm cogtrix-gemma3-270m python test_inference.py
 
 # Verify project structure
 ./verify-project.sh

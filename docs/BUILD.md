@@ -2,7 +2,9 @@
 
 ## Multi-Architecture Docker Build Configuration
 
-This project builds a minimal container image for running the Gemma 3 270M LLM model on both x86_64 and aarch64 architectures.
+This project ships two build paths:
+- a legacy PyTorch image
+- a primary fast-start llama.cpp image for CI validation
 
 ## Quick Start
 
@@ -19,42 +21,16 @@ This project builds a minimal container image for running the Gemma 3 270M LLM m
 
 # Faster-start llama.cpp variant (CPU-only, GGUF, OpenAI API)
 # Defaults: GGUF_REPO=unsloth/gemma-3-270m-it-qat-GGUF, GGUF_VARIANT=Q4_K_M
-./scripts/build-llamacpp.sh
+./scripts/build-container-image.sh
 # Override (optional):
-# GGUF_REPO=your/repo GGUF_VARIANT=Q4_K_S ./scripts/build-llamacpp.sh
+# GGUF_REPO=your/repo GGUF_VARIANT=Q4_K_S ./scripts/build-container-image.sh
 # Context window (default 4096) can be overridden at run time:
-# docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 gemma-3-270m-llamacpp
+# docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 cogtrix-gemma3-270m
 ```
 
-### Build for Specific Architecture
+### Build and Push Multi-Architecture Images
 
-```bash
-# x86_64 (AMD64)
-./scripts/build.sh --platform linux/amd64
-
-# aarch64 (ARM64)
-./scripts/build.sh --platform linux/arm64
-```
-
-### Build Multi-Architecture Image
-
-```bash
-# Enable Buildx
-docker buildx create --name multiarch --use --bootstrap
-
-# Build for both architectures
-./scripts/build.sh --multiarch
-```
-
-### Build and Push to Registry
-
-```bash
-# Push multi-arch image
-./scripts/build.sh --multiarch --push
-
-# Or with specific registry
-IMAGE_NAME=your-registry/gemma-3-270m-minimal ./scripts/build.sh --multiarch --push
-```
+Use CI for tagged release images. For manual multi-arch publishing, use `docker buildx` directly.
 
 ## Usage
 
@@ -62,19 +38,22 @@ IMAGE_NAME=your-registry/gemma-3-270m-minimal ./scripts/build.sh --multiarch --p
 
 ```bash
 # Basic inference
-docker run -it gemma-3-270m-minimal python inference.py --prompt "Hello, how are you?"
-
-# With GPU support
-docker run --gpus all -it gemma-3-270m-minimal python inference.py --prompt "Hello"
+docker run -it cogtrix-gemma3-270m python inference.py --prompt "Hello, how are you?"
 
 # Interactive mode
-docker run -it gemma-3-270m-minimal python inference.py --interactive
+docker run -it cogtrix-gemma3-270m python inference.py --interactive
+
+# Fast-start OpenAI-compatible server
+docker run -p 8080:8080 cogtrix-gemma3-270m
+
+# Override context window (default 4096)
+docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 cogtrix-gemma3-270m
 ```
 
 ### Custom Parameters
 
 ```bash
-docker run --rm gemma-3-270m-minimal python inference.py \
+docker run --rm cogtrix-gemma3-270m python inference.py \
   --prompt "Explain quantum computing" \
   --max-tokens 100 \
   --temperature 0.8
@@ -89,22 +68,21 @@ docker run --rm gemma-3-270m-minimal python inference.py \
 
 ## Image Specifications
 
-- **Base Image**: python:3.11-alpine
-- **Estimated Size**: ~900MB - 1GB
-- **Model**: Gemma 3 270M (Instruction-Tuned)
-- **Model Size**: ~536MB (safetensors format)
-- **PyTorch**: 2.4.0 (CPU + CUDA support)
-- **Python**: 3.11
+- **Primary runtime**: `llama.cpp` + GGUF
+- **Default model source**: `unsloth/gemma-3-270m-it-qat-GGUF`
+- **Default quantization**: `Q4_K_M`
+- **Default context**: `4096`
+- **Legacy path**: PyTorch-based image remains available
 
 ## Build Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `--name` | Image name | gemma-3-270m-minimal |
-| `--tag` | Image tag | latest |
-| `--platform` | Target platform | local |
-| `--multiarch` | Build for multiple architectures | false |
-| `--push` | Push to registry | false |
+| `IMAGE_NAME` | Output image name | `cogtrix-gemma3-270m` |
+| `TAG` | Output tag | `latest` |
+| `GGUF_REPO` | Build-time GGUF source repo | `unsloth/gemma-3-270m-it-qat-GGUF` |
+| `GGUF_VARIANT` | Build-time GGUF quantization | `Q4_K_M` |
+| `LLAMA_ARG_CTX_SIZE` | Runtime default context window | `4096` |
 
 ## Troubleshooting
 
@@ -113,9 +91,6 @@ docker run --rm gemma-3-270m-minimal python inference.py \
 **Issue**: Build fails on ARM Mac (M1/M2)
 - **Solution**: Use `--platform linux/arm64` explicitly
 
-**Issue**: CUDA not available
-- **Solution**: Expected on CPU-only systems. Container auto-detects hardware.
-
 **Issue**: Model not found
 - **Solution**: Ensure you have accepted the Gemma license on Hugging Face and have valid credentials.
 
@@ -123,25 +98,23 @@ docker run --rm gemma-3-270m-minimal python inference.py \
 
 ```bash
 # Build with debug output
-docker build --progress=plain -t gemma-3-270m-minimal .
+docker build --progress=plain -t cogtrix-gemma3-270m .
 ```
 
 ## Performance
 
-Expected inference speeds:
+Measured fast-start image on a 2 vCPU runner-class host:
 
-| Hardware | Architecture | Tokens/Second |
-|----------|-------------|---------------|
-| CPU (4 cores) | x86_64 | 5-10 |
-| CPU (8 cores) | x86_64 | 10-15 |
-| GPU (RTX 3060) | x86_64 | 50-80 |
-| Apple M1/M2 | aarch64 | 15-25 |
+| Metric | Value |
+|--------|-------|
+| Startup to `/v1/models` ready | ~1.06 s |
+| 64-token completion latency | ~0.87 s |
+| Throughput | ~73 tok/s |
 
 ## Security
 
-- Non-root user (appuser:appgroup)
-- Minimal base image (Alpine)
-- No unnecessary packages
+- Non-root user (`appuser:appgroup`)
+- Lean runtime image
 - Model weights baked into image (no runtime downloads)
 
 ## License
