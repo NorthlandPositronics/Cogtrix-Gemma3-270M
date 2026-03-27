@@ -226,8 +226,21 @@ print(response.json()['choices'][0]['message']['content'])
 docker run -d \
   -p 8080:8080 \
   --name gemma-api \
-  cogtrix-gemma3-270m \
-  sh -c 'llama-server --model $LLAMA_ARG_MODEL --ctx-size $LLAMA_ARG_CTX_SIZE --threads $LLAMA_ARG_THREADS --batch-size $LLAMA_ARG_BATCH --parallel $LLAMA_ARG_PARALLEL --port $LLAMA_ARG_PORT --host $LLAMA_ARG_HOST'
+  cogtrix-gemma3-270m
+
+# Override runtime tuning if needed
+docker run -d \
+  -p 8080:8080 \
+  -e LLAMA_ARG_CTX_SIZE=4096 \
+  -e LLAMA_ARG_THREADS=2 \
+  -e LLAMA_ARG_THREADS_BATCH=2 \
+  -e LLAMA_ARG_BATCH=64 \
+  -e LLAMA_ARG_UBATCH=64 \
+  -e LLAMA_ARG_PARALLEL=1 \
+  -e LLAMA_ARG_FLASH_ATTN=auto \
+  -e LLAMA_ARG_NO_WARMUP=1 \
+  --name gemma-api \
+  cogtrix-gemma3-270m
 ```
 
 ### Production Deployment
@@ -239,8 +252,7 @@ docker run -d \
   --memory 4g \
   --cpus 2 \
   --name gemma-api \
-  cogtrix-gemma3-270m \
-  sh -c 'llama-server --model $LLAMA_ARG_MODEL --ctx-size $LLAMA_ARG_CTX_SIZE --threads $LLAMA_ARG_THREADS --batch-size $LLAMA_ARG_BATCH --parallel $LLAMA_ARG_PARALLEL --port $LLAMA_ARG_PORT --host $LLAMA_ARG_HOST'
+  cogtrix-gemma3-270m
 ```
 
 ## Testing

@@ -16,6 +16,8 @@ docker buildx build --platform linux/amd64,linux/arm64 -t cogtrix-gemma3-270m --
 # Ultra-fast llama.cpp build (GGUF, CPU-only)
 ./scripts/build-container-image.sh
 # (defaults to unsloth/gemma-3-270m-it-qat-GGUF, variant Q4_K_M)
+# Optional CPU-specific native build:
+# GGML_NATIVE=ON ./scripts/build-container-image.sh
 ```
 
 ### Run
@@ -30,6 +32,8 @@ docker run -it cogtrix-gemma3-270m python inference.py --interactive
 docker run -p 8080:8080 cogtrix-gemma3-270m
 # Increase context (default 4096):
 #   docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 cogtrix-gemma3-270m
+# Tune llama.cpp runtime explicitly:
+#   docker run -e LLAMA_ARG_PARALLEL=1 -e LLAMA_ARG_NO_WARMUP=1 -p 8080:8080 cogtrix-gemma3-270m
 # Override GGUF at runtime if built that way:
 #   GGUF_REPO=... GGUF_VARIANT=Q4_K_S ./scripts/build-container-image.sh
 ```
@@ -92,15 +96,23 @@ docker run -e LLAMA_ARG_CTX_SIZE=2048 -p 8080:8080 cogtrix-gemma3-270m
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `LLAMA_ARG_CTX_SIZE` | Runtime context window | 4096 |
+| `LLAMA_ARG_THREADS_BATCH` | Prompt / batch CPU threads | 2 |
+| `LLAMA_ARG_BATCH` | Logical batch size | 64 |
+| `LLAMA_ARG_UBATCH` | Physical batch size | 64 |
+| `LLAMA_ARG_PARALLEL` | Server slots | 1 |
+| `LLAMA_ARG_NO_WARMUP` | Skip empty warmup run | 1 |
+| `LLAMA_ARG_FLASH_ATTN` | Flash attention mode | auto |
 | `GGUF_REPO` | Build-time GGUF repository override | unsloth/gemma-3-270m-it-qat-GGUF |
 | `GGUF_VARIANT` | Build-time GGUF quantization override | Q4_K_M |
+| `GGML_NATIVE` | Build host-optimized llama.cpp binary | OFF |
 
 ## Performance Tips
 
 1. **Context**: Lower `LLAMA_ARG_CTX_SIZE` if you need less RAM or faster cold start.
-2. **Threads**: Keep `LLAMA_ARG_THREADS=2` on GitHub-hosted 2 vCPU runners.
-3. **Quantization**: Keep `Q4_K_M` unless you have measured a better tradeoff.
-4. **Batch size**: Reduce `LLAMA_ARG_BATCH` if you see memory pressure.
+2. **Threads**: Keep `LLAMA_ARG_THREADS=2` and `LLAMA_ARG_THREADS_BATCH=2` on 2 vCPU runners.
+3. **Warmup**: Keep `LLAMA_ARG_NO_WARMUP=1` for the lowest cold-start latency.
+4. **Parallelism**: Keep `LLAMA_ARG_PARALLEL=1` for CI validation workloads.
+5. **Quantization**: Keep `Q4_K_M` unless you have measured a better tradeoff.
 
 ## Security Notes
 

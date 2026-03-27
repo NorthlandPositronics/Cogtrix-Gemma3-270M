@@ -24,6 +24,8 @@ This project ships two build paths:
 ./scripts/build-container-image.sh
 # Override (optional):
 # GGUF_REPO=your/repo GGUF_VARIANT=Q4_K_S ./scripts/build-container-image.sh
+# CPU-specific native build (optional, less portable):
+# GGML_NATIVE=ON ./scripts/build-container-image.sh
 # Context window (default 4096) can be overridden at run time:
 # docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 cogtrix-gemma3-270m
 ```
@@ -48,6 +50,18 @@ docker run -p 8080:8080 cogtrix-gemma3-270m
 
 # Override context window (default 4096)
 docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 cogtrix-gemma3-270m
+
+# Override llama.cpp runtime tuning
+docker run \
+  -e LLAMA_ARG_THREADS=2 \
+  -e LLAMA_ARG_THREADS_BATCH=2 \
+  -e LLAMA_ARG_BATCH=64 \
+  -e LLAMA_ARG_UBATCH=64 \
+  -e LLAMA_ARG_PARALLEL=1 \
+  -e LLAMA_ARG_NO_WARMUP=1 \
+  -e LLAMA_ARG_FLASH_ATTN=auto \
+  -p 8080:8080 \
+  cogtrix-gemma3-270m
 ```
 
 ### Custom Parameters
@@ -83,6 +97,13 @@ docker run --rm cogtrix-gemma3-270m python inference.py \
 | `GGUF_REPO` | Build-time GGUF source repo | `unsloth/gemma-3-270m-it-qat-GGUF` |
 | `GGUF_VARIANT` | Build-time GGUF quantization | `Q4_K_M` |
 | `LLAMA_ARG_CTX_SIZE` | Runtime default context window | `4096` |
+| `GGML_NATIVE` | Build host-optimized llama.cpp binary | `OFF` |
+| `LLAMA_ARG_THREADS_BATCH` | Prompt / batch CPU threads | `2` |
+| `LLAMA_ARG_BATCH` | Logical batch size | `64` |
+| `LLAMA_ARG_UBATCH` | Physical batch size | `64` |
+| `LLAMA_ARG_PARALLEL` | Server slots | `1` |
+| `LLAMA_ARG_NO_WARMUP` | Skip empty warmup run | `1` |
+| `LLAMA_ARG_FLASH_ATTN` | Flash attention mode | `auto` |
 
 ## Troubleshooting
 
@@ -110,6 +131,10 @@ Measured fast-start image on a 2 vCPU runner-class host:
 | Startup to `/v1/models` ready | ~1.06 s |
 | 64-token completion latency | ~0.87 s |
 | Throughput | ~73 tok/s |
+
+Notes:
+- `GGML_NATIVE=ON` can trim startup and slightly improve tok/s on the exact CPU family it was built for.
+- `GGML_NATIVE=ON` reduces portability and should be used only when you control the deployment target.
 
 ## Security
 
