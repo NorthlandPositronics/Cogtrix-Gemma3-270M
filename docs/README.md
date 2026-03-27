@@ -14,13 +14,13 @@ A minimal Docker container for running the Gemma 3 270M LLM model with OpenAI-co
 
 ```bash
 # CPU-only mode
-docker run -it gemma-3-270m-minimal python src/inference.py --prompt "Hello"
+docker run -it cogtrix-gemma3-270m python src/inference.py --prompt "Hello"
 
 # Interactive mode
-docker run -it gemma-3-270m-minimal python src/inference.py --interactive
+docker run -it cogtrix-gemma3-270m python src/inference.py --interactive
 
 # API server mode
-docker run -p 8080:8080 gemma-3-270m-minimal python src/api_server.py
+docker run -p 8080:8080 cogtrix-gemma3-270m python src/api_server.py
 ```
 
 ### Test the API
@@ -39,14 +39,17 @@ curl http://localhost:8080/v1/chat/completions \
 
 ```
 .
-├── build.sh                 # Build script for multi-architecture images
+├── scripts/                 # Build helpers
+│   ├── build.sh             # PyTorch image build script
+│   └── build-container-image.sh    # llama.cpp image build script
 ├── requirements.txt         # Python dependencies
 ├── .github/               # GitHub Actions workflows
 ├── .gitignore            # Git ignore rules
 ├── .dockerignore         # Docker ignore rules
 ├── docker/               # Docker-related files
-│   ├── Dockerfile        # Multi-stage Dockerfile
-│   └── Dockerfile.llamacpp # Fast-start llama.cpp image
+│   ├── Dockerfile        # Multi-stage PyTorch Dockerfile
+│   ├── Dockerfile.llamacpp # Fast-start llama.cpp image
+│   └── download_gguf.py  # Build-time GGUF fetch helper
 ├── src/                  # Source code
 │   ├── inference.py      # Direct inference script
 │   ├── api_server.py     # OpenAI-compatible API server
@@ -64,15 +67,14 @@ curl http://localhost:8080/v1/chat/completions \
 │   ├── PROJECT_SUMMARY.md # Project summary
 │   ├── QUICK_REFERENCE.md # Quick reference
 │   └── TESTING_RESULTS.md # Test results
-├── examples/             # Example usage
-└── data/                 # Data files and model weights
+└── examples/             # Example usage
 ```
 
 ## 🔧 Features
 
-- **Minimal Image Size**: ~900MB - 1GB optimized container
+- **Minimal Image Size**: optimized fast-start llama.cpp image for CI validation
 - **Multi-Architecture**: Supports x86_64 and aarch64
-- **CPU & GPU**: Runs on both CPU and GPU (CUDA)
+- **CPU Only**: optimized image has no GPU runtime path
 - **OpenAI-Compatible API**: Drop-in replacement for OpenAI API
 - **Streaming Support**: Server-Sent Events (SSE) for streaming responses
 - **Model Embedded**: Gemma 3 270M weights baked into the image
@@ -81,11 +83,9 @@ curl http://localhost:8080/v1/chat/completions \
 
 | Component | Size |
 |-----------|------|
-| Base (python:3.11-alpine) | ~45 MB |
-| PyTorch (CPU+GPU) | ~200-300 MB |
-| Transformers | ~100 MB |
-| Gemma 3 270M Weights | ~536 MB |
-| **Total** | **~900 MB - 1 GB** |
+| llama.cpp runtime | lean native binary |
+| GGUF model (Q4_K_M) | ~235 MB class |
+| **Total** | much smaller than the legacy PyTorch image |
 
 ## 📖 Documentation
 
@@ -99,7 +99,7 @@ curl http://localhost:8080/v1/chat/completions \
 
 ```bash
 # Run inference tests
-docker run -it gemma-3-270m-minimal python src/test_inference.py
+docker run -it cogtrix-gemma3-270m python src/test_inference.py
 
 # Test API endpoints
 curl http://localhost:8080/health

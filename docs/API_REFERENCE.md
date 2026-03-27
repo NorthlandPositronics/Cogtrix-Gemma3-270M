@@ -289,7 +289,7 @@ Currently, there is no built-in rate limiting. Add middleware in production envi
 docker run -d \
   -p 8080:8080 \
   -v ./model:/app/model \
-  gemma-3-270m-minimal \
+  cogtrix-gemma3-270m \
   python api_server.py --host 0.0.0.0 --port 8080
 
 # Test the API

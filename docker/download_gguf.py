@@ -38,5 +38,9 @@ if not ggufs:
 
 target = Path(f"/model/gemma-3-270m-{variant.lower()}.gguf")
 ggufs[0].rename(target)
+current = Path("/model/current-model.gguf")
+if current.exists() or current.is_symlink():
+    current.unlink()
+current.symlink_to(target.name)
 print(f"GGUF ready at {target}", flush=True)
 print("Download complete.", flush=True)

@@ -5,7 +5,7 @@ set -e
 # Supports x86_64 and aarch64 architectures
 # Requires HF_TOKEN env var to download model weights at build time.
 
-IMAGE_NAME="gemma-3-270m-minimal"
+IMAGE_NAME="cogtrix-gemma3-270m"
 VERSION="latest"
 ARCH=$(uname -m)
 

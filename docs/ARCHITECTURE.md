@@ -2,19 +2,19 @@
 
 ## Supported Architectures
 
-This project supports the following CPU architectures:
+This project supports the following CPU architectures for the fast-start CPU-only image:
 
 ### 1. x86_64 (AMD64)
 - **Platform**: `linux/amd64`
 - **Status**: Fully supported
 - **Use Cases**: Desktops, laptops, servers, cloud instances
-- **Performance**: Excellent CPU and GPU support
+- **Performance**: Excellent CPU support
 
 ### 2. aarch64 (ARM64)
 - **Platform**: `linux/arm64`
 - **Status**: Fully supported
 - **Use Cases**: Apple Silicon Macs, ARM servers, Raspberry Pi 4/5, AWS Graviton
-- **Performance**: Good CPU support, GPU support varies by platform
+- **Performance**: Good CPU support
 
 ## Building for Each Architecture
 
@@ -24,8 +24,8 @@ This project supports the following CPU architectures:
 # Direct build
 docker build --platform linux/amd64 -t gemma-3-270m:amd64 .
 
-# Using build script (tags :latest)
-./build.sh --platform linux/amd64
+# Using build script
+./scripts/build.sh
 ```
 
 ### aarch64 (ARM64)
@@ -34,20 +34,17 @@ docker build --platform linux/amd64 -t gemma-3-270m:amd64 .
 # Direct build
 docker build --platform linux/arm64 -t gemma-3-270m:arm64 .
 
-# Using build script (tags :latest)
-./build.sh --platform linux/arm64
+# Using build script
+./scripts/build.sh
 ```
 
 ### Multi-Architecture Build
 
 ```bash
-# Using build script
-./build.sh --multiarch
-
 # Manual Docker Buildx
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t gemma-3-270m-minimal:latest \
+  -t cogtrix-gemma3-270m:latest \
   --push \
   .
 ```
@@ -61,12 +58,6 @@ docker buildx build \
 - Good performance on modern CPUs
 - Memory: ~4-6 GB RAM recommended
 
-**GPU Inference**:
-- NVIDIA CUDA support
-- AMD ROCm support (experimental)
-- Requires NVIDIA GPU with CUDA support
-- Memory: GPU VRAM should be at least 4 GB
-
 ### aarch64 (Linux/macOS)
 
 **CPU Inference**:
@@ -75,21 +66,13 @@ docker buildx build \
 - Good performance on ARM servers
 - Memory: ~4-6 GB RAM recommended
 
-**GPU Inference**:
-- Apple Metal (MPS) on macOS
-- NVIDIA CUDA on ARM servers (Ampere, Hopper)
-- Performance varies by platform
-
 ## Performance Comparison
 
 | Platform | Architecture | Inference Speed | Notes |
 |----------|-------------|-----------------|-------|
-| Intel i7-12700K | x86_64 | ~15 tokens/s | 8-core CPU |
-| AMD Ryzen 9 5900X | x86_64 | ~18 tokens/s | 12-core CPU |
-| NVIDIA RTX 3060 | x86_64 | ~60 tokens/s | 12GB VRAM |
-| Apple M1 Pro | aarch64 | ~25 tokens/s | 16GB unified |
-| Apple M2 Max | aarch64 | ~35 tokens/s | 32GB unified |
-| AWS Graviton3 | aarch64 | ~20 tokens/s | 64 vCPUs |
+| 2 vCPU runner-class host | x86_64 | ~73 tok/s | llama.cpp Q4_K_M, 64-token sample |
+| Apple M1 Pro | aarch64 | workload-dependent | expected good CPU support |
+| AWS Graviton3 | aarch64 | workload-dependent | expected good CPU support |
 
 ## Multi-Arch Image Distribution
 
@@ -99,7 +82,7 @@ docker buildx build \
 # Build and push multi-arch manifest
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t your-dockerhub-username/gemma-3-270m-minimal:latest \
+  -t your-dockerhub-username/cogtrix-gemma3-270m:latest \
   --push \
   .
 ```
@@ -113,7 +96,7 @@ echo $GITHUB_TOKEN | docker login ghcr.io -u USERNAME --password-stdin
 # Build and push
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  -t ghcr.io/username/gemma-3-270m-minimal:latest \
+  -t ghcr.io/username/cogtrix-gemma3-270m:latest \
   --push \
   .
 ```
@@ -124,17 +107,17 @@ docker buildx build \
 
 ```bash
 # List image details
-docker inspect gemma-3-270m-minimal | grep Architecture
+docker inspect cogtrix-gemma3-270m | grep Architecture
 
 # Run and check inside container
-docker run --rm gemma-3-270m-minimal python -c "import platform; print(platform.machine())"
+docker run --rm cogtrix-gemma3-270m python -c "import platform; print(platform.machine())"
 ```
 
 ### Verify Multi-Arch Manifest
 
 ```bash
 # Inspect manifest
-docker manifest inspect your-registry/gemma-3-270m-minimal:latest
+docker manifest inspect your-registry/cogtrix-gemma3-270m:latest
 
 # Should show both amd64 and arm64 variants
 ```
@@ -148,10 +131,10 @@ docker manifest inspect your-registry/gemma-3-270m-minimal:latest
 **Solution**:
 ```bash
 # Pull specific architecture
-docker pull --platform linux/amd64 gemma-3-270m-minimal
+docker pull --platform linux/amd64 cogtrix-gemma3-270m
 
 # Or build locally for your architecture
-docker build --platform linux/$(uname -m) -t gemma-3-270m-minimal .
+docker build --platform linux/$(uname -m) -t cogtrix-gemma3-270m .
 ```
 
 ### Issue: Slow performance on ARM
@@ -163,18 +146,11 @@ docker build --platform linux/$(uname -m) -t gemma-3-270m-minimal .
 **Solutions**:
 ```bash
 # Ensure correct architecture image
-docker pull --platform linux/arm64 gemma-3-270m-minimal
+docker pull --platform linux/arm64 cogtrix-gemma3-270m
 
 # Enable Metal on Apple Silicon
-docker run --rm -e METAL_DEVICE_WRAPPER_TYPE=1 gemma-3-270m-minimal
+docker run --rm -e METAL_DEVICE_WRAPPER_TYPE=1 cogtrix-gemma3-270m
 ```
-
-### Issue: CUDA not available on ARM
-
-**Note**: CUDA support on ARM depends on the platform:
-- **NVIDIA Jetson**: Supported with JetPack
-- **AWS Graviton**: No CUDA, CPU only
-- **Apple Silicon**: Use MPS instead of CUDA
 
 ## Future Architecture Support
 

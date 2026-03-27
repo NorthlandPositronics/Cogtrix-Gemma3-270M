@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide covers deploying the Gemma 3 270M minimal container image in various environments.
+This guide covers deploying the CPU-only `cogtrix-gemma3-270m` container image in various environments.
 
 ## Deployment Options
 
@@ -12,13 +12,10 @@ This guide covers deploying the Gemma 3 270M minimal container image in various 
 
 ```bash
 # Build image
-docker build -t gemma-3-270m-minimal .
+docker build -t cogtrix-gemma3-270m .
 
-# Run with GPU (if available)
-docker run --gpus all -it gemma-3-270m-minimal python inference.py --interactive
-
-# Run CPU-only
-docker run -it gemma-3-270m-minimal python inference.py --interactive
+# Run the OpenAI-compatible server
+docker run -p 8080:8080 cogtrix-gemma3-270m
 ```
 
 #### Docker Compose
@@ -31,18 +28,9 @@ version: '3.8'
 services:
   gemma-3-270m:
     build: .
-    image: gemma-3-270m-minimal:latest
-    stdin_open: true
-    tty: true
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    environment:
-      - MODEL_PATH=/app/model
+    image: cogtrix-gemma3-270m:latest
+    ports:
+      - "8080:8080"
 ```
 
 Run with:
@@ -55,25 +43,19 @@ docker-compose up
 #### AWS EC2
 
 **Prerequisites**:
-- EC2 instance with NVIDIA GPU (e.g., g4dn.xlarge)
-- NVIDIA Container Toolkit installed
+- EC2 instance sized for CPU inference
+- Docker installed
 
 **Setup**:
 
 ```bash
-# Install Docker and NVIDIA Container Toolkit
+# Install Docker
 sudo apt update
 sudo apt install -y docker.io
-curl -s -L https://nvidia.github.io/libnvidia-container/gpgkey | sudo apt-key add -
-curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-sudo apt update
-sudo apt install -y nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
 
 # Build and run
-docker build -t gemma-3-270m-minimal .
-docker run --gpus all -it gemma-3-270m-minimal python inference.py --interactive
+docker build -t cogtrix-gemma3-270m .
+docker run -p 8080:8080 cogtrix-gemma3-270m
 ```
 
 #### Google Cloud Platform (GCP)
@@ -82,14 +64,14 @@ docker run --gpus all -it gemma-3-270m-minimal python inference.py --interactive
 
 ```bash
 # Build for x86_64
-docker build --platform linux/amd64 -t gcr.io/PROJECT_ID/gemma-3-270m-minimal .
+docker build --platform linux/amd64 -t gcr.io/PROJECT_ID/cogtrix-gemma3-270m .
 
 # Push to Artifact Registry
-docker push gcr.io/PROJECT_ID/gemma-3-270m-minimal
+docker push gcr.io/PROJECT_ID/cogtrix-gemma3-270m
 
 # Deploy to Cloud Run
 gcloud run deploy gemma-3-270m \
-  --image gcr.io/PROJECT_ID/gemma-3-270m-minimal \
+  --image gcr.io/PROJECT_ID/cogtrix-gemma3-270m \
   --platform managed \
   --region us-central1 \
   --allow-unauthenticated \
@@ -97,14 +79,13 @@ gcloud run deploy gemma-3-270m \
   --memory 8Gi
 ```
 
-**Using GKE with GPU**:
+**Using GKE**:
 
 ```bash
-# Create GKE cluster with GPU
+# Create GKE cluster
 gcloud container clusters create gemma-cluster \
   --zone us-central1-a \
-  --machine-type n1-standard-8 \
-  --accelerator type=nvidia-tesla-t4,count=1
+  --machine-type e2-standard-4
 
 # Deploy to GKE
 kubectl apply -f k8s-deployment.yaml
@@ -114,17 +95,17 @@ kubectl apply -f k8s-deployment.yaml
 
 ```bash
 # Build and tag
-docker build -t gemma-3-270m-minimal .
-docker tag gemma-3-270m-minimal YOUR_REGISTRY.azurecr.io/gemma-3-270m-minimal:latest
+docker build -t cogtrix-gemma3-270m .
+docker tag cogtrix-gemma3-270m YOUR_REGISTRY.azurecr.io/cogtrix-gemma3-270m:latest
 
 # Push to Azure Container Registry
-docker push YOUR_REGISTRY.azurecr.io/gemma-3-270m-minimal:latest
+docker push YOUR_REGISTRY.azurecr.io/cogtrix-gemma3-270m:latest
 
 # Deploy to ACI
 az container create \
   --resource-group myResourceGroup \
   --name gemma-3-270m \
-  --image YOUR_REGISTRY.azurecr.io/gemma-3-270m-minimal:latest \
+  --image YOUR_REGISTRY.azurecr.io/cogtrix-gemma3-270m:latest \
   --gpu-count 1 \
   --gpu-vm-size Standard_NC6s_v3 \
   --memory 16 \
@@ -152,7 +133,7 @@ spec:
     spec:
       containers:
       - name: gemma
-        image: gemma-3-270m-minimal:latest
+        image: cogtrix-gemma3-270m:latest
         command: ["python", "inference.py", "--interactive"]
         resources:
           limits:
@@ -198,26 +179,26 @@ sudo apt update
 sudo apt install -y docker.io
 
 # Build for ARM64
-docker build --platform linux/arm64 -t gemma-3-270m-minimal .
+docker build --platform linux/arm64 -t cogtrix-gemma3-270m .
 
 # Run
-docker run -it gemma-3-270m-minimal python inference.py --prompt "Hello"
+docker run -it cogtrix-gemma3-270m python inference.py --prompt "Hello"
 ```
 
 **Note**: Performance will be slower on Raspberry Pi. Consider using quantized models for better performance.
 
-#### NVIDIA Jetson
+#### ARM Edge Devices
 
 ```bash
-# Install JetPack and Docker
+# Install Docker
 sudo apt update
-sudo apt install -y docker.io nvidia-docker2
+sudo apt install -y docker.io
 
 # Build for ARM64
-docker build --platform linux/arm64 -t gemma-3-270m-minimal .
+docker build --platform linux/arm64 -t cogtrix-gemma3-270m .
 
-# Run with GPU
-docker run --gpus all -it gemma-3-270m-minimal python inference.py --interactive
+# Run
+docker run -p 8080:8080 cogtrix-gemma3-270m
 ```
 
 ### 5. Production Deployment
@@ -301,19 +282,19 @@ volumes:
 
 ### Minimum Requirements
 
-| Resource | CPU | GPU |
-|----------|-----|-----|
-| RAM | 4 GB | 4 GB + 4 GB VRAM |
-| Storage | 2 GB | 2 GB |
-| CPU Cores | 2 | 2 |
+| Resource | Value |
+|----------|-------|
+| RAM | 4 GB |
+| Storage | 2 GB |
+| CPU Cores | 2 |
 
 ### Recommended Requirements
 
-| Resource | CPU | GPU |
-|----------|-----|-----|
-| RAM | 8 GB | 16 GB + 8 GB VRAM |
-| Storage | 4 GB | 4 GB |
-| CPU Cores | 4 | 4 |
+| Resource | Value |
+|----------|-------|
+| RAM | 8 GB |
+| Storage | 4 GB |
+| CPU Cores | 4 |
 
 ## Scaling Considerations
 
@@ -330,7 +311,7 @@ For high-traffic deployments:
 For complex tasks:
 
 1. **Increase Memory**: Allocate more RAM
-2. **Use GPU**: Enable GPU acceleration
+2. **Increase CPU**: Allocate more CPU capacity if throughput is insufficient
 3. **Optimize Parameters**: Reduce max_tokens for faster response
 
 ## Security Best Practices
@@ -355,22 +336,22 @@ For complex tasks:
 **Issue**: Container crashes with OOM
 ```bash
 # Increase memory limit
-docker run -m 8g gemma-3-270m-minimal
+docker run -m 8g cogtrix-gemma3-270m
 ```
 
 **Issue**: Slow inference
 ```bash
-# Enable GPU if available
-docker run --gpus all gemma-3-270m-minimal
+# Reduce context size if needed
+docker run -e LLAMA_ARG_CTX_SIZE=2048 -p 8080:8080 cogtrix-gemma3-270m
 
 # Reduce max_tokens
-docker run gemma-3-270m-minimal python inference.py --max-tokens 100
+docker run cogtrix-gemma3-270m python inference.py --max-tokens 100
 ```
 
 **Issue**: Model not found
 ```bash
 # Rebuild image to ensure model is included
-docker build --no-cache -t gemma-3-270m-minimal .
+docker build --no-cache -t cogtrix-gemma3-270m .
 ```
 
 ## Monitoring and Logging
@@ -382,7 +363,7 @@ docker build --no-cache -t gemma-3-270m-minimal .
 docker logs -f gemma-container
 
 # Log to file
-docker run --log-driver json-file --log-opt max-size=10m gemma-3-270m-minimal
+docker run --log-driver json-file --log-opt max-size=10m cogtrix-gemma3-270m
 ```
 
 ### Kubernetes Logging
