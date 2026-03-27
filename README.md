@@ -15,6 +15,8 @@ A minimal Docker container for running the Gemma 3 270M LLM model with OpenAI-co
 ./scripts/build-container-image.sh
 # Override GGUF repo/variant if needed:
 # GGUF_REPO=some/other-repo GGUF_VARIANT=Q4_K_S ./scripts/build-container-image.sh
+# Build a host-optimized native llama.cpp binary if you control the CPU target:
+# GGML_NATIVE=ON ./scripts/build-container-image.sh
 ```
 
 ### Run the Container
@@ -27,6 +29,8 @@ docker run -it cogtrix-gemma3-270m python src/inference.py --prompt "Hello"
 docker run -p 8080:8080 cogtrix-gemma3-270m
 # Override context window if needed (default 4096):
 #   docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 cogtrix-gemma3-270m
+# Useful runtime overrides:
+#   docker run -e LLAMA_ARG_PARALLEL=1 -e LLAMA_ARG_NO_WARMUP=1 -p 8080:8080 cogtrix-gemma3-270m
 
 # Interactive mode
 docker run -it cogtrix-gemma3-270m python src/inference.py --interactive
@@ -87,6 +91,7 @@ curl http://localhost:8080/v1/chat/completions \
 
 - **Minimal Image Size**: optimized fast-start llama.cpp image for CI validation
 - **Fast-Start Variant**: llama.cpp + GGUF image starts in about a second on 2 vCPU runners
+- **Tuned Defaults**: llama.cpp path defaults to `threads-batch=2`, `batch=64`, `ubatch=64`, `parallel=1`, `no-warmup=1`
 - **Multi-Architecture**: Supports x86_64 and aarch64
 - **CPU Only**: no CUDA, ROCm, or MPS runtime path in the optimized image
 - **OpenAI-Compatible API**: drop-in replacement for OpenAI API
@@ -100,6 +105,27 @@ curl http://localhost:8080/v1/chat/completions \
 | Runtime base + llama.cpp | lean Debian runtime |
 | GGUF weights (Q4_K_M) | ~235 MB class |
 | **Total** | significantly smaller than the PyTorch image |
+
+## llama.cpp Tuning
+
+The fast-start image is tuned for small CPU runners:
+
+- `LLAMA_ARG_CTX_SIZE=4096`
+- `LLAMA_ARG_THREADS=2`
+- `LLAMA_ARG_THREADS_BATCH=2`
+- `LLAMA_ARG_BATCH=64`
+- `LLAMA_ARG_UBATCH=64`
+- `LLAMA_ARG_PARALLEL=1`
+- `LLAMA_ARG_FLASH_ATTN=auto`
+- `LLAMA_ARG_NO_WARMUP=1`
+
+If you control the deployment CPU target, you can also build a host-optimized binary:
+
+```bash
+GGML_NATIVE=ON ./scripts/build-container-image.sh
+```
+
+That build is CPU-specific and should be treated as an optimization variant, not a universally portable image.
 
 ## 📖 Documentation
 
