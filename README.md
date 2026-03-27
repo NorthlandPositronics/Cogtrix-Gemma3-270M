@@ -25,8 +25,6 @@ docker run -it gemma-3-270m-minimal python src/inference.py --prompt "Hello"
 
 # llama.cpp OpenAI server (fast startup, CPU-only, Unsloth QAT GGUF baked in)
 docker run -p 8080:8080 gemma-3-270m-llamacpp
-# Override context window if needed (default 4096):
-#   docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 gemma-3-270m-llamacpp
 
 # Interactive mode
 docker run -it gemma-3-270m-minimal python src/inference.py --interactive

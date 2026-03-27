@@ -31,8 +31,6 @@ docker run --gpus all -it gemma-3-270m-minimal python inference.py --prompt "Hel
 
 # OpenAI-compatible llama.cpp server (fast start)
 docker run -p 8080:8080 gemma-3-270m-llamacpp
-# Increase context (default 4096):
-#   docker run -e LLAMA_ARG_CTX_SIZE=8192 -p 8080:8080 gemma-3-270m-llamacpp
 # Override GGUF at runtime if built that way:
 #   GGUF_REPO=... GGUF_VARIANT=Q4_K_S ./scripts/build-llamacpp.sh
 ```
